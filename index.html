@@ -1,0 +1,4315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Core Wars</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-drag: none; }
+        input, textarea { user-select: text; -webkit-user-select: text; }
+
+        body, html {
+            overflow: hidden;
+            width: 100%; height: 100%;
+            background: #0d1117;
+            background-image: radial-gradient(circle, rgba(148,163,184,0.08) 1px, transparent 1px);
+            background-size: 28px 28px;
+            font-family: 'Barlow', sans-serif;
+            color: #0f172a;
+        }
+
+        canvas { display: block; position: absolute; top: 0; left: 0; user-select: none; -webkit-user-drag: none; }
+
+        #ui {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 12px;
+            z-index: 10;
+        }
+
+        .hidden { display: none !important; }
+        .ia { pointer-events: auto; }
+
+        /* Dark glass panel — used everywhere */
+        .glass {
+            background: rgba(10, 15, 28, 0.80);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            box-shadow: 0 2px 20px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.07);
+        }
+
+        /* Dark glass (for lobby) */
+        .glass-dark {
+            background: rgba(10, 15, 28, 0.88);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            box-shadow: 0 8px 48px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.07);
+        }
+
+        .bb {
+            transition: transform 0.12s ease, box-shadow 0.12s ease;
+            cursor: pointer;
+        }
+        .bb:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.12); }
+        .bb.sel {
+            border-color: #f59e0b !important;
+            background: rgba(251,191,36,0.10) !important;
+            box-shadow: 0 0 0 2px rgba(251,191,36,0.35) !important;
+        }
+
+        .field {
+            display: block; width: 100%;
+            background: #f8fafc;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-family: 'Barlow', sans-serif;
+            font-size: 21px; color: #0f172a;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .field:focus {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+        }
+        .field::placeholder { color: #94a3b8; }
+
+        .field-dark {
+            display: block; width: 100%;
+            background: rgba(255,255,255,0.06);
+            border: 1.5px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-family: 'Barlow', sans-serif;
+            font-size: 19px; color: #e2e8f0;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .field-dark:focus {
+            border-color: rgba(251,191,36,0.6);
+            box-shadow: 0 0 0 3px rgba(251,191,36,0.12);
+        }
+        .field-dark::placeholder { color: rgba(255,255,255,0.25); }
+
+        .lbl {
+            display: block;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 15px; font-weight: 700;
+            letter-spacing: 2px; color: rgba(255,255,255,0.35);
+            text-transform: uppercase; margin-bottom: 6px;
+        }
+        .lbl-dark {
+            display: block;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 14px; font-weight: 700;
+            letter-spacing: 2px; color: rgba(255,255,255,0.35);
+            text-transform: uppercase; margin-bottom: 5px;
+        }
+
+        @keyframes fadeSlideUp {
+            from { opacity: 0; transform: translateY(14px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeSlideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes respawnBlink {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0.35; }
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(251,191,36,0.4), 0 4px 22px rgba(0,0,0,0.25); }
+            50%       { box-shadow: 0 0 0 10px rgba(251,191,36,0), 0 4px 22px rgba(0,0,0,0.25); }
+        }
+        @keyframes spin-slow {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50%       { transform: translateY(-8px); }
+        }
+        @keyframes scanline {
+            0%   { transform: translateY(-100%); }
+            100% { transform: translateY(100vh); }
+        }
+
+        .fade-in  { animation: fadeSlideUp  0.4s cubic-bezier(0.22,1,0.36,1) forwards; }
+        .fade-in-d { animation: fadeSlideDown 0.35s cubic-bezier(0.22,1,0.36,1) forwards; }
+        #respawnText { animation: respawnBlink 0.85s ease-in-out infinite; }
+
+        /* HUD */
+        #hud-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: stretch;
+            gap: 8px;
+        }
+        #hud-bottom {
+            display: flex;
+            justify-content: flex-start;
+            align-items: flex-end;
+            gap: 8px;
+            padding-left: 122px; /* clear the sidebar (~110px wide + 12px gap) */
+        }
+        .bfill { transition: width 0.28s ease; }
+
+        /* ══════════ SCREENS ══════════ */
+        .screen {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+        }
+
+        /* ── START SCREEN ── */
+        #startScreen {
+            flex-direction: column;
+            background: #0a0e1a;
+            background-image:
+                radial-gradient(ellipse 80% 60% at 20% 50%, rgba(127,29,29,0.22) 0%, transparent 60%),
+                radial-gradient(ellipse 80% 60% at 80% 50%, rgba(29,78,216,0.22) 0%, transparent 60%),
+                radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: auto, auto, 32px 32px;
+        }
+
+        /* animated scanline */
+        #startScreen::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to bottom, transparent 50%, rgba(255,255,255,0.015) 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        #startLogo {
+            position: relative;
+            width: min(480px, 90vw);
+            animation: float 4s ease-in-out infinite;
+        }
+
+        .start-banner {
+            position: relative;
+            height: 200px;
+            border-radius: 20px 20px 0 0;
+            overflow: hidden;
+        }
+
+        #btnPlay {
+            padding: 15px 72px;
+            background: rgba(255,255,255,0.06);
+            color: white; border: 1px solid rgba(255,255,255,0.18);
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 32px; letter-spacing: 6px;
+            transition: background 0.2s, border-color 0.2s, transform 0.12s, box-shadow 0.2s;
+        }
+        #btnPlay:hover  { background: rgba(255,255,255,0.11); border-color: rgba(255,255,255,0.35); box-shadow: 0 0 40px rgba(220,38,38,0.15), 0 0 40px rgba(37,99,235,0.15); }
+        #btnPlay:active { transform: scale(0.97); }
+
+        .start-subtitle {
+            margin-top: 28px;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 16px; letter-spacing: 5px;
+            color: rgba(255,255,255,0.25);
+            text-transform: uppercase;
+        }
+
+        /* ── MATCHMAKING SCREEN ── */
+        #matchmakeScreen {
+            background: rgba(10,14,26,0.7);
+            backdrop-filter: blur(4px);
+        }
+
+        #btnJoin {
+            width: 100%; padding: 14px;
+            background: linear-gradient(125deg, #dc2626 0%, #7c3aed 50%, #2563eb 100%);
+            color: white; border: none; border-radius: 10px; cursor: pointer;
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 30px; letter-spacing: 3px;
+            box-shadow: 0 4px 22px rgba(0,0,0,0.18);
+            transition: opacity 0.2s, transform 0.12s;
+        }
+        #btnJoin:hover  { opacity: 0.88; }
+        #btnJoin:active { transform: scale(0.98); }
+
+        #btnBack {
+            background: none; border: none; cursor: pointer;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 18px; font-weight: 700; letter-spacing: 2px;
+            color: rgba(255,255,255,0.3); text-transform: uppercase;
+            padding: 6px 0;
+            transition: color 0.2s;
+        }
+        #btnBack:hover { color: rgba(255,255,255,0.75); }
+
+        /* ── LOBBY SCREEN ── */
+        #lobbyScreen {
+            background: rgba(6, 9, 18, 0.85);
+            backdrop-filter: blur(6px);
+        }
+
+        #lobbyPanel {
+            width: min(780px, 96vw);
+            height: min(580px, 92vh);
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: #e2e8f0;
+        }
+
+        #lobbyHeader {
+            padding: 16px 22px;
+            background: rgba(255,255,255,0.04);
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        #lobbyBody {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Chat section */
+        #chatSection {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border-right: 1px solid rgba(255,255,255,0.06);
+        }
+
+        #chatLog {
+            flex: 1;
+            overflow-y: auto;
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            scroll-behavior: smooth;
+        }
+        #chatLog::-webkit-scrollbar { width: 4px; }
+        #chatLog::-webkit-scrollbar-track { background: transparent; }
+        #chatLog::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+
+        .chat-msg {
+            font-size: 18px;
+            line-height: 1.45;
+            animation: fadeSlideUp 0.2s ease forwards;
+        }
+        .chat-msg .msg-name {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-weight: 700;
+            font-size: 16px;
+            letter-spacing: 0.5px;
+            margin-right: 6px;
+        }
+        .chat-msg .msg-text { color: rgba(255,255,255,0.72); }
+        .chat-msg.system-msg {
+            color: rgba(255,255,255,0.3);
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 15px;
+            letter-spacing: 0.3px;
+            font-style: italic;
+            text-align: center;
+            padding: 2px 0;
+        }
+
+        #chatInputRow {
+            padding: 12px 14px;
+            border-top: 1px solid rgba(255,255,255,0.06);
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        #chatSendBtn {
+            padding: 0 18px;
+            background: linear-gradient(135deg, #dc2626, #2563eb);
+            color: white; border: none; border-radius: 8px; cursor: pointer;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 18px; font-weight: 700; letter-spacing: 1px;
+            white-space: nowrap;
+            transition: opacity 0.2s;
+        }
+        #chatSendBtn:hover { opacity: 0.82; }
+
+        /* Players section */
+        #playersSection {
+            width: 220px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #playersSectionHeader {
+            padding: 12px 14px 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            flex-shrink: 0;
+        }
+
+        #playerList {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        #playerList::-webkit-scrollbar { width: 3px; }
+        #playerList::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+        .player-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.06);
+            animation: fadeSlideUp 0.25s ease forwards;
+        }
+        .player-chip .dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .player-chip .pname {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 18px; font-weight: 700;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .player-chip.me {
+            border-color: rgba(251,191,36,0.3);
+            background: rgba(251,191,36,0.06);
+        }
+
+        #lobbyFooter {
+            padding: 12px 22px;
+            background: rgba(255,255,255,0.03);
+            border-top: 1px solid rgba(255,255,255,0.06);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .waiting-dots span {
+            display: inline-block;
+            animation: respawnBlink 1.2s ease-in-out infinite;
+        }
+        .waiting-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .waiting-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+        #playerCounter {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 14px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 20px;
+        }
+        #playerCounter .count-num {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 30px;
+            line-height: 1;
+        }
+        #playerCounter .count-label {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.4);
+        }
+
+        /* Team badge */
+        .team-badge {
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 16px; font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        .team-badge.red { background: rgba(220,38,38,0.18); color: #fca5a5; border: 1px solid rgba(220,38,38,0.3); }
+        .team-badge.blue { background: rgba(37,99,235,0.18); color: #93c5fd; border: 1px solid rgba(37,99,235,0.3); }
+
+        /* HUD buttons */
+        /* Upgrade panel */
+        #upgradePanel {
+            border-radius: 12px;
+            padding: 12px 14px;
+            min-width: 260px;
+            max-width: 380px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        #wallUpgradePanel {
+            border-radius: 12px;
+            padding: 12px 14px;
+            min-width: 220px;
+            max-width: 320px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .upg-btn {
+            flex: 1;
+            min-width: 100px;
+            border-radius: 8px;
+            padding: 9px 10px;
+            text-align: left;
+            outline: none;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .upg-btn:hover { transform: translateY(-2px); }
+        .upg-btn.cant-afford { cursor: not-allowed; opacity: 0.5; }
+        .upg-btn.cant-afford:hover { transform: none; }
+        .upg-max {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 15px; font-weight: 700; letter-spacing: 2px;
+            color: rgba(251,191,36,0.7); text-transform: uppercase;
+            padding: 4px 0;
+        }
+
+        /* ── Ready button ── */
+        #readyBtn {
+            width: 100%; padding: 13px;
+            border: none; border-radius: 10px; cursor: pointer;
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 27px; letter-spacing: 3px;
+            transition: opacity 0.18s, transform 0.12s, background 0.2s;
+        }
+        #readyBtn.state-idle    { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.6); border: 1.5px solid rgba(255,255,255,0.15); }
+        #readyBtn.state-ready   { background: linear-gradient(135deg,#166534,#22c55e); color: #fff; border: 1.5px solid #22c55e; box-shadow: 0 0 18px rgba(34,197,94,0.3); }
+        #readyBtn.state-notready{ background: linear-gradient(135deg,#7f1d1d,#ef4444); color: #fff; border: 1.5px solid #ef4444; box-shadow: 0 0 18px rgba(239,68,68,0.3); }
+        #readyBtn:hover { opacity: 0.88; transform: translateY(-1px); }
+        #readyBtn:active { transform: scale(0.97); }
+
+        /* ── Lobby countdown ── */
+        #lobbyCountdownWrap {
+            text-align: center;
+            padding: 10px 0 4px;
+            border-top: 1px solid rgba(255,255,255,0.06);
+            flex-shrink: 0;
+        }
+
+        /* ── Player ready indicator ── */
+        .ready-pip {
+            display: inline-block;
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            margin-left: auto;
+        }
+        .ready-pip.yes  { background: #22c55e; box-shadow: 0 0 5px rgba(34,197,94,0.7); }
+        .ready-pip.no   { background: #ef4444; box-shadow: 0 0 5px rgba(239,68,68,0.6); }
+        .ready-pip.idle { background: rgba(255,255,255,0.18); }
+
+        /* ── Vote Screen ── */
+        #voteScreen {
+            background: rgba(6,9,18,0.92);
+            backdrop-filter: blur(8px);
+            flex-direction: column;
+            gap: 0;
+        }
+        #votePanel {
+            width: min(900px, 97vw);
+            max-height: 96vh;
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: #e2e8f0;
+        }
+        #voteHeader {
+            padding: 18px 28px 14px;
+            background: rgba(255,255,255,0.04);
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        #voteBody {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        .vote-col {
+            flex: 1;
+            padding: 20px 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+        }
+        .vote-col:first-child {
+            border-right: 1px solid rgba(255,255,255,0.07);
+        }
+        .vote-col::-webkit-scrollbar { width: 3px; }
+        .vote-col::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+        .vote-card {
+            border-radius: 12px;
+            padding: 14px 16px;
+            cursor: pointer;
+            border: 1.5px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.03);
+            transition: border-color 0.15s, background 0.15s, transform 0.12s;
+        }
+        .vote-card:hover { transform: translateY(-2px); background: rgba(255,255,255,0.06); }
+        .vote-card.voted {
+            border-color: rgba(251,191,36,0.6);
+            background: rgba(251,191,36,0.08);
+            box-shadow: 0 0 0 2px rgba(251,191,36,0.18);
+        }
+        .vote-card-title {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 27px; letter-spacing: 2px;
+        }
+        .vote-card-desc {
+            font-family: 'Barlow', sans-serif;
+            font-size: 16px; color: rgba(255,255,255,0.45);
+            margin-top: 4px; line-height: 1.5;
+        }
+        .vote-bar-wrap {
+            margin-top: 8px;
+            display: flex; gap: 4px; align-items: center;
+        }
+        .vote-bar-bg {
+            flex: 1; height: 4px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 2px; overflow: hidden;
+        }
+        .vote-bar-fill {
+            height: 100%; border-radius: 2px;
+            background: #f59e0b;
+            transition: width 0.3s ease;
+        }
+        .vote-bar-count {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 19px; color: rgba(251,191,36,0.8);
+            min-width: 18px; text-align: right;
+        }
+
+        #hud-top { display: flex; justify-content: space-between; align-items: stretch; gap: 8px; }
+        #hud-bottom { display: flex; justify-content: space-between; align-items: flex-end; gap: 8px; }
+
+        /* ── In-game chat bar ── */
+        #gameChatWrap {
+            position: fixed;
+            bottom: 72px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 300;
+            display: flex;
+            align-items: center;
+            gap: 0;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.18s;
+        }
+        #gameChatWrap.open {
+            opacity: 1;
+            pointer-events: all;
+        }
+        #gameChatBar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(6,9,20,0.88);
+            border: 1.5px solid rgba(255,255,255,0.18);
+            border-radius: 10px;
+            padding: 8px 14px;
+            min-width: 340px;
+            max-width: 560px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+            backdrop-filter: blur(6px);
+        }
+        #gameChatLabel {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 15px; font-weight: 700;
+            letter-spacing: 2px;
+            color: rgba(255,255,255,0.3);
+            text-transform: uppercase;
+            flex-shrink: 0;
+        }
+        #gameChatInput {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: white;
+            font-family: 'Barlow', sans-serif;
+            font-size: 19px;
+            caret-color: #f59e0b;
+        }
+        #gameChatInput::placeholder { color: rgba(255,255,255,0.25); }
+        #gameChatHint {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 14px; font-weight: 700;
+            letter-spacing: 1px;
+            color: rgba(255,255,255,0.2);
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+<body>
+<canvas id="gc" draggable="false"></canvas>
+
+<!-- ══════════════════ START SCREEN ══════════════════ -->
+<div id="startScreen" class="screen">
+    <div style="display:flex;flex-direction:column;align-items:center;position:relative;z-index:1;user-select:none;">
+
+        <!-- Eyebrow line -->
+        <div style="display:flex;align-items:center;gap:18px;margin-bottom:36px;">
+            <div style="width:100px;height:1px;background:linear-gradient(to left,rgba(220,38,38,0.55),transparent);"></div>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:6px;color:rgba(255,255,255,0.18);text-transform:uppercase;">2v2 Core Siege</div>
+            <div style="width:100px;height:1px;background:linear-gradient(to right,rgba(37,99,235,0.55),transparent);"></div>
+        </div>
+
+        <!-- Giant title -->
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:clamp(88px,15vw,152px);color:white;line-height:0.86;letter-spacing:10px;text-align:center;text-shadow:0 0 120px rgba(220,38,38,0.25),0 0 200px rgba(37,99,235,0.18);">CORE<br>WARS</div>
+
+        <!-- Red / Blue accent bar -->
+        <div style="display:flex;height:3px;width:min(420px,70vw);border-radius:2px;overflow:hidden;margin-top:20px;">
+            <div style="flex:1;background:linear-gradient(to right,#7f1d1d,#ef4444);"></div>
+            <div style="flex:1;background:linear-gradient(to right,#3b82f6,#1e3a8a);"></div>
+        </div>
+
+        <!-- Tagline -->
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;color:rgba(255,255,255,0.2);letter-spacing:7px;font-weight:700;text-transform:uppercase;margin-top:18px;">Build · Defend · Destroy</div>
+
+        <!-- Play button -->
+        <button id="btnPlay" class="ia" style="margin-top:56px;">▶ &nbsp; PLAY</button>
+
+        <!-- Team hints -->
+        <div style="margin-top:24px;display:flex;gap:22px;align-items:center;">
+            <div style="display:flex;align-items:center;gap:7px;">
+                <div style="width:6px;height:6px;border-radius:50%;background:#ef4444;box-shadow:0 0 8px rgba(239,68,68,0.8);"></div>
+                <span style="font-family:'Barlow Condensed',sans-serif;font-size:14px;color:rgba(255,255,255,0.18);letter-spacing:3px;font-weight:700;text-transform:uppercase;">Red</span>
+            </div>
+            <div style="width:1px;height:10px;background:rgba(255,255,255,0.1);"></div>
+            <div style="display:flex;align-items:center;gap:7px;">
+                <div style="width:6px;height:6px;border-radius:50%;background:#3b82f6;box-shadow:0 0 8px rgba(59,130,246,0.8);"></div>
+                <span style="font-family:'Barlow Condensed',sans-serif;font-size:14px;color:rgba(255,255,255,0.18);letter-spacing:3px;font-weight:700;text-transform:uppercase;">Blue</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════ MATCHMAKING SCREEN ══════════════════ -->
+<div id="matchmakeScreen" class="screen hidden">
+    <div class="glass-dark fade-in" style="width:100%;max-width:360px;border-radius:16px;padding:32px 28px 24px;box-shadow:0 24px 80px rgba(0,0,0,0.5),inset 0 0 0 1px rgba(255,255,255,0.07);">
+
+        <!-- Header -->
+        <div style="text-align:center;margin-bottom:28px;">
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:57px;color:white;letter-spacing:5px;line-height:1;">FIND MATCH</div>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;color:rgba(255,255,255,0.22);letter-spacing:5px;font-weight:700;text-transform:uppercase;margin-top:4px;">Enter the arena</div>
+        </div>
+
+        <!-- Form -->
+        <div style="display:flex;flex-direction:column;gap:14px;">
+            <div>
+                <label class="lbl-dark" for="pName">Player Name</label>
+                <input id="pName" class="field-dark ia" value="Pilot"/>
+            </div>
+            <div>
+                <label class="lbl-dark" for="rCode">Room Code <span style="font-size:14px;color:rgba(255,255,255,0.18);font-weight:600;">(optional)</span></label>
+                <input id="rCode" class="field-dark ia" placeholder="Leave blank for Auto-Match"/>
+            </div>
+            <button id="btnJoin" class="ia" style="margin-top:4px;">Deploy / Find Match</button>
+            <p id="connStatus" style="text-align:center;font-family:'Barlow',sans-serif;font-size:18px;min-height:18px;"></p>
+            <button id="btnBack" class="ia">← Back</button>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════ LOBBY SCREEN ══════════════════ -->
+<div id="lobbyScreen" class="screen hidden">
+    <div id="lobbyPanel" class="glass-dark fade-in-d">
+
+        <!-- Header -->
+        <div id="lobbyHeader">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <div style="font-family:'Bebas Neue',sans-serif;font-size:35px;letter-spacing:3px;color:white;line-height:1;">LOBBY</div>
+                <div style="width:1px;height:20px;background:rgba(255,255,255,0.12);"></div>
+                <div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;letter-spacing:3px;color:rgba(255,255,255,0.35);text-transform:uppercase;">Room: <span id="lobbyRoomCode" style="color:rgba(251,191,36,0.75);">—</span></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span id="myTeamBadge" class="team-badge hidden">TEAM</span>
+                <div id="playerCounter">
+                    <span id="counterNum" class="count-num" style="color:white;">0</span>
+                    <div>
+                        <div class="count-label">Players</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Body: chat + right panel -->
+        <div id="lobbyBody">
+            <!-- Chat -->
+            <div id="chatSection">
+                <div id="chatLog"></div>
+                <div id="chatInputRow">
+                    <input id="chatInput" class="field-dark ia" placeholder="Say something…" maxlength="120" autocomplete="off"/>
+                    <button id="chatSendBtn" class="ia">Send</button>
+                </div>
+            </div>
+
+            <!-- Right panel: players + ready -->
+            <div id="playersSection">
+                <div id="playersSectionHeader">
+                    <div class="lbl-dark">In Lobby</div>
+                </div>
+                <div id="playerList"></div>
+
+                <!-- Ready button -->
+                <div style="padding:10px 10px 4px;flex-shrink:0;">
+                    <button id="readyBtn" class="ia state-idle" onclick="toggleReady()">READY UP</button>
+                </div>
+
+                <!-- Lobby countdown -->
+                <div id="lobbyCountdownWrap">
+                    <div id="lobbyCountdownLabel" style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:2px;color:rgba(255,255,255,0.28);text-transform:uppercase;">Waiting for players</div>
+                    <div id="lobbyCountdownNum" style="font-family:'Bebas Neue',sans-serif;font-size:43px;color:rgba(255,255,255,0.18);letter-spacing:2px;line-height:1.15;">∞</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div id="lobbyFooter">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;color:rgba(255,255,255,0.3);letter-spacing:1px;">
+                <span class="waiting-dots">Waiting for game to start<span>.</span><span>.</span><span>.</span></span>
+            </div>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;color:rgba(255,255,255,0.2);letter-spacing:2px;text-transform:uppercase;">
+                Core Wars
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════ VOTE SCREEN ══════════════════ -->
+<div id="voteScreen" class="screen hidden">
+    <div id="votePanel" class="glass-dark fade-in">
+
+        <!-- Header -->
+        <div id="voteHeader">
+            <div>
+                <div style="font-family:'Bebas Neue',sans-serif;font-size:38px;letter-spacing:4px;color:white;line-height:1;">VOTE</div>
+                <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:3px;color:rgba(255,255,255,0.3);text-transform:uppercase;margin-top:2px;">Choose your faction & map</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:3px;color:rgba(255,255,255,0.3);text-transform:uppercase;">Time left</div>
+                <div id="voteTimer" style="font-family:'Bebas Neue',sans-serif;font-size:62px;color:#f59e0b;letter-spacing:2px;line-height:1;">25</div>
+            </div>
+        </div>
+
+        <!-- Body: faction (left) + map (right) -->
+        <div id="voteBody">
+            <!-- Faction vote column -->
+            <div class="vote-col">
+                <div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;letter-spacing:3px;color:rgba(255,255,255,0.28);text-transform:uppercase;margin-bottom:2px;">Your Team's Faction</div>
+                <div id="factionVoteCards"></div>
+                <div id="factionTallyBar" style="margin-top:6px;"></div>
+            </div>
+
+            <!-- Map vote column -->
+            <div class="vote-col">
+                <div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;letter-spacing:3px;color:rgba(255,255,255,0.28);text-transform:uppercase;margin-bottom:2px;">Map — Global Vote</div>
+                <div id="mapVoteCards"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════ IN-GAME UI ══════════════════ -->
+<div id="ui">
+
+    <!-- TOP HUD -->
+    <div id="hud-top" class="hidden">
+        <div class="glass ia" style="border-radius:12px;padding:10px 16px;display:flex;align-items:center;gap:12px;min-width:188px;">
+            <div style="width:10px;height:10px;border-radius:50%;background:#dc2626;flex-shrink:0;box-shadow:0 0 10px rgba(220,38,38,0.7);"></div>
+            <div style="flex:1;">
+                <div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;letter-spacing:2.5px;color:#fca5a5;text-transform:uppercase;">Red Core</div>
+                <div style="width:100%;height:7px;background:rgba(255,255,255,0.08);border-radius:4px;margin-top:5px;overflow:hidden;">
+                    <div id="redBar" class="bfill" style="height:100%;width:100%;background:linear-gradient(90deg,#991b1b,#ef4444);border-radius:4px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass" style="border-radius:12px;padding:8px 28px;text-align:center;flex-shrink:0;">
+            <div id="phaseDisplay" style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;letter-spacing:3px;color:rgba(255,255,255,0.35);text-transform:uppercase;">WAITING</div>
+            <div id="timerDisplay" style="font-family:'Bebas Neue',sans-serif;font-size:51px;color:white;line-height:1.1;letter-spacing:1px;">--:--</div>
+            <div id="factionBanner" style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:2px;color:rgba(255,255,255,0.3);text-transform:uppercase;margin-top:2px;display:none;"></div>
+            <div id="mapNameDisplay" style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:3px;color:rgba(255,255,255,0.18);text-transform:uppercase;margin-top:1px;display:none;"></div>
+        </div>
+
+        <div class="glass ia" style="border-radius:12px;padding:10px 16px;display:flex;align-items:center;gap:12px;min-width:188px;flex-direction:row-reverse;">
+            <div style="width:10px;height:10px;border-radius:50%;background:#2563eb;flex-shrink:0;box-shadow:0 0 10px rgba(37,99,235,0.7);"></div>
+            <div style="flex:1;text-align:right;">
+                <div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;letter-spacing:2.5px;color:#93c5fd;text-transform:uppercase;">Blue Core</div>
+                <div style="width:100%;height:7px;background:rgba(255,255,255,0.08);border-radius:4px;margin-top:5px;overflow:hidden;">
+                    <div id="blueBar" class="bfill" style="height:100%;width:100%;background:linear-gradient(270deg,#1d4ed8,#3b82f6);border-radius:4px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MIDDLE (game over / respawn) -->
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;pointer-events:none;">
+
+        <!-- GAME OVER -->
+        <div id="gameOverScreen" class="hidden ia fade-in" style="text-align:center;padding:52px 52px 48px;border-radius:20px;max-width:400px;width:90%;box-shadow:0 28px 80px rgba(0,0,0,0.28);">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;letter-spacing:5px;color:rgba(255,255,255,0.55);margin-bottom:6px;text-transform:uppercase;">Victory</div>
+            <h2 id="winnerText" style="font-family:'Bebas Neue',sans-serif;font-size:86px;color:white;letter-spacing:2px;line-height:1;margin:0;">TEAM WINS!</h2>
+            <button onclick="location.reload()" style="margin-top:32px;padding:13px 44px;background:rgba(255,255,255,0.95);color:#0f172a;font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:2px;border:none;border-radius:10px;cursor:pointer;transition:transform 0.12s,box-shadow 0.2s;display:inline-block;" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 10px 28px rgba(0,0,0,0.22)'" onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='none'" onmousedown="this.style.transform='scale(0.97)'" onmouseup="this.style.transform='translateY(-2px)'">Play Again</button>
+        </div>
+
+        <!-- RESPAWN -->
+        <div id="respawnText" class="hidden" style="text-align:center;padding:22px 52px;background:rgba(10,15,30,0.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-radius:14px;border:1px solid rgba(255,255,255,0.07);">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;letter-spacing:4px;color:rgba(255,255,255,0.45);margin-bottom:4px;text-transform:uppercase;">Respawning In</div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:90px;color:#ef4444;line-height:1;"><span id="respawnTimer"></span></div>
+        </div>
+    </div>
+
+    <!-- BOTTOM HUD -->
+    <div id="hud-bottom" class="hidden">
+        <div class="glass ia" style="border-radius:12px;padding:12px 16px;min-width:162px;">
+            <div class="lbl-dark">Health</div>
+            <div style="width:100%;height:8px;background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden;">
+                <div id="hpBar" style="height:100%;width:100%;background:#22c55e;border-radius:4px;transition:width 0.2s,background 0.3s;"></div>
+            </div>
+            <div style="margin-top:10px;display:flex;align-items:baseline;gap:7px;">
+                <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;letter-spacing:2px;color:rgba(255,255,255,0.35);text-transform:uppercase;">Scrap</span>
+                <span id="scrapVal" style="font-family:'Bebas Neue',sans-serif;font-size:35px;color:#f59e0b;line-height:1;">0</span>
+            </div>
+        </div>
+
+        <!-- spacer so health stays left-aligned -->
+        <div style="flex:1;"></div>
+    </div>
+
+</div><!-- /#ui -->
+
+<!-- ══════════════════ LEFT SIDEBAR — Build / Upgrade ══════════════════ -->
+<div id="sidebar" class="hidden ia" style="
+    position: fixed;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+">
+    <!-- Build menu -->
+    <div id="buildMenu" class="hidden glass ia" style="
+        border-radius: 14px;
+        padding: 12px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        pointer-events: auto;
+    ">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:2px;color:rgba(255,255,255,0.3);text-transform:uppercase;text-align:center;margin-bottom:2px;">Place</div>
+
+        <button id="btnWall" class="bb ia" onclick="selectBuild('w')" style="border:1.5px solid rgba(255,255,255,0.1);border-radius:10px;padding:10px 14px;background:rgba(255,255,255,0.05);text-align:center;min-width:82px;outline:none;cursor:pointer;">
+            <svg viewBox="0 0 38 30" width="38" height="30" draggable="false" style="display:block;margin:0 auto 5px;pointer-events:none;">
+                <rect x="1" y="1" width="36" height="10" rx="2" fill="#334155"/>
+                <rect x="1" y="13" width="36" height="16" rx="2" fill="#475569"/>
+                <rect x="2" y="14" width="16" height="7" rx="1" fill="#64748b"/>
+                <rect x="20" y="14" width="16" height="7" rx="1" fill="#64748b"/>
+                <rect x="2" y="22" width="10" height="7" rx="1" fill="#64748b"/>
+                <rect x="14" y="22" width="12" height="7" rx="1" fill="#64748b"/>
+                <rect x="28" y="22" width="9" height="7" rx="1" fill="#64748b"/>
+            </svg>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,0.7);text-transform:uppercase;">Wall</div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:21px;color:#f59e0b;line-height:1.3;" id="wallCostDisplay">10</div>
+        </button>
+
+        <button id="btnTurret" class="bb ia" onclick="selectBuild('t')" style="border:1.5px solid rgba(255,255,255,0.1);border-radius:10px;padding:10px 14px;background:rgba(255,255,255,0.05);text-align:center;min-width:82px;outline:none;cursor:pointer;">
+            <svg viewBox="0 0 38 38" width="38" height="38" draggable="false" style="display:block;margin:0 auto 5px;pointer-events:none;">
+                <circle cx="19" cy="24" r="13" fill="#334155"/>
+                <circle cx="19" cy="24" r="8"  fill="#475569"/>
+                <circle cx="19" cy="24" r="3.5" fill="#64748b"/>
+                <rect x="17.5" y="2" width="3" height="22" rx="1.5" fill="#64748b"/>
+                <rect x="16"   y="1" width="6"  height="6"  rx="1.5" fill="#94a3b8"/>
+            </svg>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,0.7);text-transform:uppercase;">Turret</div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:21px;color:#f59e0b;line-height:1.3;" id="turretCostDisplay">30</div>
+        </button>
+    </div>
+
+    <!-- UPGRADE PANEL — shown when a friendly turret is selected -->
+    <div id="upgradePanel" class="hidden glass ia" style="pointer-events:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <div id="upgPanelName" style="font-family:'Bebas Neue',sans-serif;font-size:23px;color:white;letter-spacing:2px;">MK-I DEFENDER</div>
+            <button onclick="deselectTurret()" style="background:none;border:none;color:rgba(255,255,255,0.3);cursor:pointer;font-size:21px;line-height:1;padding:2px 4px;">✕</button>
+        </div>
+        <div id="upgPanelStats" style="font-family:'Barlow Condensed',sans-serif;font-size:14px;color:rgba(255,255,255,0.38);letter-spacing:1px;margin-bottom:8px;line-height:1.6;"></div>
+        <div id="upgPanelOptions" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+    </div>
+
+    <!-- WALL UPGRADE PANEL — shown when a friendly wall is selected -->
+    <div id="wallUpgradePanel" class="hidden glass ia" style="pointer-events:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <div id="wallUpgPanelName" style="font-family:'Bebas Neue',sans-serif;font-size:23px;color:white;letter-spacing:2px;">FIELD BARRICADE</div>
+            <button onclick="deselectWall()" style="background:none;border:none;color:rgba(255,255,255,0.3);cursor:pointer;font-size:21px;line-height:1;padding:2px 4px;">✕</button>
+        </div>
+        <div id="wallUpgPanelStats" style="font-family:'Barlow Condensed',sans-serif;font-size:14px;color:rgba(255,255,255,0.38);letter-spacing:1px;margin-bottom:8px;line-height:1.6;"></div>
+        <div id="wallUpgPanelOptions" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+    </div>
+</div>
+
+<!-- ══════════════════ IN-GAME CHAT BAR ══════════════════ -->
+<div id="gameChatWrap">
+    <div id="gameChatBar">
+        <span id="gameChatLabel">Chat</span>
+        <input id="gameChatInput" maxlength="120" autocomplete="off" spellcheck="false" placeholder="Type a message…"/>
+        <span id="gameChatHint">Enter · Send &nbsp;│&nbsp; Esc · Close</span>
+    </div>
+</div>
+
+<script>
+// ─── Canvas / ctx ─────────────────────────────────────────────────────────────
+const canvas = document.getElementById('gc');
+const ctx    = canvas.getContext('2d');
+
+// ─── Screen refs ──────────────────────────────────────────────────────────────
+const $startScreen    = document.getElementById('startScreen');
+const $matchScreen    = document.getElementById('matchmakeScreen');
+const $lobbyScreen    = document.getElementById('lobbyScreen');
+const $voteScreen     = document.getElementById('voteScreen');
+
+// ─── UI refs (in-game) ────────────────────────────────────────────────────────
+const $hudTop      = document.getElementById('hud-top');
+const $hudBot      = document.getElementById('hud-bottom');
+const $gameOver    = document.getElementById('gameOverScreen');
+const $buildMenu   = document.getElementById('buildMenu');
+const $sidebar     = document.getElementById('sidebar');
+const $respawn     = document.getElementById('respawnText');
+const $respawnSec  = document.getElementById('respawnTimer');
+const $connStatus  = document.getElementById('connStatus');
+
+// ─── Screen management ────────────────────────────────────────────────────────
+function showScreen(name) {
+    $startScreen.classList.add('hidden');
+    $matchScreen.classList.add('hidden');
+    $lobbyScreen.classList.add('hidden');
+    $voteScreen.classList.add('hidden');
+    $hudTop.classList.add('hidden');
+    $hudBot.classList.add('hidden');
+    $sidebar.classList.add('hidden');
+
+    if (name === 'start')     $startScreen.classList.remove('hidden');
+    if (name === 'matchmake') $matchScreen.classList.remove('hidden');
+    if (name === 'lobby')     $lobbyScreen.classList.remove('hidden');
+    if (name === 'vote')      $voteScreen.classList.remove('hidden');
+    if (name === 'game') {
+        $hudTop.classList.remove('hidden');
+        $hudBot.classList.remove('hidden');
+        $sidebar.classList.remove('hidden');
+    }
+}
+
+// ─── Angle codec ──────────────────────────────────────────────────────────────
+// Server compresses angle to uint8 (0-255); decode back to radians here.
+function decodeAngle(b) {
+    return (b / 256) * Math.PI * 2 - Math.PI;
+}
+
+// ─── Game world state ─────────────────────────────────────────────────────────
+let myId           = null;
+let myRoomId       = null;
+let mapData        = { mw: 3000, mh: 1400 };
+let mapWaterZones  = [];   // [{x,y,w,h}, …] — impassable water rectangles
+let mapSpawns      = [{ x: 380, y: 700 }, { x: 2620, y: 700 }];
+let mapName        = '';
+let coreData       = [];
+let coreHPs        = [2500, 2500];
+let currentPhase   = 0;
+let currentTimer   = 0;
+let timerReceivedAt = 0;   // performance.now() when server last sent the timer
+let timerBaseValue  = 0;   // the timer value at that moment
+let gameWinner     = -1;
+let renderStarted  = false;
+
+const myState = { x: 0, y: 0, a: 0, team: -1, hp: 100, maxHp: 100, rt: 0, res: 0, name: '', r: 15, burnUntil: 0 };
+
+// Interpolation buffer: position snapshots for smooth remote movement
+const interpBufs   = new Map();   // id → [{t,i,x,y,a}, …]
+const INTERP_DELAY = 100;
+
+// Separate mutable state for remote players (hp, rt) — updated by events
+const remoteState  = new Map();   // id → {hp, rt}
+
+// Name/team directory — populated by 'names' broadcast, not snapshot
+const playerNames  = new Map();   // id → {nm, tm}
+
+const localBuildings   = new Map();
+const localProjectiles = new Map();
+
+// ─── In-game chat state ────────────────────────────────────────────────────────
+let gameChatOpen = false;
+// Map: playerId → { msg, expireAt }  — bubbles to render above each player
+const chatBubbles = new Map();
+let chatMessages      = [];
+let inputSendInterval = null;
+
+// Ready state
+let myReadyState = null;   // null | true | false
+
+// Vote phase state
+let myFactionVote  = null;
+let myMapVote      = null;
+let factionTally   = {};    // my team's faction votes { roe:2, bgm:0, ... }
+let mapTally       = {};    // global map votes { 0:2, 1:1, 2:0 }
+let voteMapList    = [];    // [{id, name}, ...]
+
+// Faction/team runtime state (resolved at game start)
+let teamFactions       = ['roe', 'roe'];
+let factionVoteTallies = [{}, {}];   // legacy compat, not used in vote UI anymore
+
+function addChatMessage(nm, msg, team, isMe = false, isSystem = false) {
+    const entry = { nm, msg, team, isMe, isSystem };
+    chatMessages.push(entry);
+    renderChatMessage(entry);
+}
+
+function renderChatMessage(m) {
+    const log = document.getElementById('chatLog');
+    if (!log) return;
+    const div = document.createElement('div');
+    div.className = 'chat-msg' + (m.isSystem ? ' system-msg' : '');
+    if (m.isSystem) {
+        div.textContent = m.msg;
+    } else {
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'msg-name';
+        nameSpan.textContent = m.nm;
+        nameSpan.style.color = m.team === 0 ? '#fca5a5' : m.team === 1 ? '#93c5fd' : 'rgba(251,191,36,0.85)';
+        const textSpan = document.createElement('span');
+        textSpan.className = 'msg-text';
+        textSpan.textContent = m.msg;
+        div.appendChild(nameSpan);
+        div.appendChild(textSpan);
+    }
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+}
+
+// Rebuild lobby player list from playerNames map
+function rebuildLobbyPlayers() {
+    const list = document.getElementById('playerList');
+    if (!list) return;
+    list.innerHTML = '';
+    for (const [id, p] of playerNames) {
+        const isMe = id === myId;
+        const chip = document.createElement('div');
+        chip.className = 'player-chip' + (isMe ? ' me' : '');
+        chip.dataset.pid = id;
+        const dot = document.createElement('div');
+        dot.className = 'dot';
+        dot.style.background  = p.tm === 0 ? '#ef4444' : p.tm === 1 ? '#3b82f6' : '#94a3b8';
+        dot.style.boxShadow   = p.tm === 0 ? '0 0 6px rgba(239,68,68,0.6)' : p.tm === 1 ? '0 0 6px rgba(59,130,246,0.6)' : 'none';
+        const nameEl = document.createElement('div');
+        nameEl.className = 'pname';
+        nameEl.textContent = (p.nm || '—') + (isMe ? ' (you)' : '');
+        nameEl.style.color = p.tm === 0 ? '#fca5a5' : p.tm === 1 ? '#93c5fd' : '#e2e8f0';
+        const pip = document.createElement('div');
+        pip.className = 'ready-pip ' + (p.rd === true ? 'yes' : p.rd === false ? 'no' : 'idle');
+        chip.appendChild(dot);
+        chip.appendChild(nameEl);
+        chip.appendChild(pip);
+        list.appendChild(chip);
+    }
+    document.getElementById('counterNum').textContent = playerNames.size;
+}
+
+function sendChat() {
+    const input = document.getElementById('chatInput');
+    const msg = input.value.trim();
+    if (!msg || !ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ t: 'chat', msg }));
+    addChatMessage(myState.name, msg, myState.team, true);
+    input.value = '';
+}
+
+// ─── In-game chat bar ─────────────────────────────────────────────────────────
+function openGameChat() {
+    gameChatOpen = true;
+    const wrap  = document.getElementById('gameChatWrap');
+    const input = document.getElementById('gameChatInput');
+    if (!wrap || !input) return;
+    wrap.classList.add('open');
+    input.value = '';
+    input.focus();
+}
+
+function closeGameChat() {
+    gameChatOpen = false;
+    const wrap  = document.getElementById('gameChatWrap');
+    const input = document.getElementById('gameChatInput');
+    if (!wrap || !input) return;
+    wrap.classList.remove('open');
+    input.blur();
+    canvas.focus();
+}
+
+function sendGameChat() {
+    const input = document.getElementById('gameChatInput');
+    if (!input) return;
+    const msg = input.value.trim();
+    closeGameChat();
+    if (!msg || !ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ t: 'chat', msg }));
+    // Show bubble on self immediately
+    chatBubbles.set(myId, { msg, expireAt: performance.now() + 4500 });
+    // Also add to lobby/game chat log
+    addChatMessage(myState.name, msg, myState.team, true);
+}
+
+// ─── Ready button ─────────────────────────────────────────────────────────────
+function toggleReady() {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    // Cycle: idle → ready → notready → ready
+    if (myReadyState === null || myReadyState === false) {
+        myReadyState = true;
+    } else {
+        myReadyState = false;
+    }
+    ws.send(JSON.stringify({ t: 'ready', r: myReadyState }));
+    updateReadyBtn();
+}
+
+function updateReadyBtn() {
+    const btn = document.getElementById('readyBtn');
+    if (!btn) return;
+    btn.className = 'ia ' + (myReadyState === true ? 'state-ready' : myReadyState === false ? 'state-notready' : 'state-idle');
+    btn.textContent = myReadyState === true ? '✔ READY' : myReadyState === false ? '✘ NOT READY' : 'READY UP';
+}
+
+// ─── Lobby state handler ──────────────────────────────────────────────────────
+function handleLobbyState(d) {
+    const tm  = d.tm;   // -1 = infinite, else seconds
+    const n   = d.n;
+
+    const numEl   = document.getElementById('lobbyCountdownNum');
+    const lblEl   = document.getElementById('lobbyCountdownLabel');
+    if (!numEl || !lblEl) return;
+
+    if (n < 2) {
+        lblEl.textContent = 'Waiting for players…';
+        numEl.textContent = '∞';
+        numEl.style.color = 'rgba(255,255,255,0.18)';
+    } else if (tm < 0) {
+        lblEl.textContent = 'Game paused — someone not ready';
+        numEl.textContent = '∞';
+        numEl.style.color = '#ef4444';
+    } else {
+        const m = Math.floor(tm / 60);
+        const s = tm % 60;
+        numEl.textContent = m > 0 ? `${m}:${String(s).padStart(2,'0')}` : `${tm}s`;
+        numEl.style.color = tm <= 10 ? '#ef4444' : tm <= 30 ? '#f59e0b' : '#22c55e';
+        lblEl.textContent = tm <= 30 ? 'Starting soon!' : 'Lobby countdown';
+    }
+
+    // Refresh ready pips in player list from d.rd
+    if (d.rd) {
+        const readyMap = {};
+        for (const e of d.rd) readyMap[e.i] = e.r;
+        document.querySelectorAll('.player-chip[data-pid]').forEach(chip => {
+            const pid = chip.dataset.pid;
+            const pip = chip.querySelector('.ready-pip');
+            if (!pip) return;
+            const state = readyMap[pid];
+            pip.className = 'ready-pip ' + (state === true ? 'yes' : state === false ? 'no' : 'idle');
+        });
+    }
+}
+
+// ─── Vote screen ──────────────────────────────────────────────────────────────
+function handleVoteStart(d) {
+    voteMapList   = d.maps || [];
+    myFactionVote = null;
+    myMapVote     = null;
+    factionTally  = {};
+    mapTally      = {};
+
+    buildFactionVoteCards();
+    buildMapVoteCards();
+
+    const timerEl = document.getElementById('voteTimer');
+    if (timerEl) timerEl.textContent = d.tm;
+
+    showScreen('vote');
+    addChatMessage(null, `⚔ Voting started! ${d.tm}s to choose faction & map.`, -1, false, true);
+}
+
+function handleVoteTick(d) {
+    const timerEl = document.getElementById('voteTimer');
+    if (timerEl) {
+        timerEl.textContent = d.tm;
+        timerEl.style.color = d.tm <= 5 ? '#ef4444' : '#f59e0b';
+    }
+}
+
+function buildFactionVoteCards() {
+    const el = document.getElementById('factionVoteCards');
+    if (!el) return;
+    el.innerHTML = '';
+    const totalVotes = Object.values(factionTally).reduce((a, b) => a + b, 0);
+    for (const [fid, f] of Object.entries(FACTIONS)) {
+        const v = factionTally[fid] || 0;
+        const pct = totalVotes > 0 ? Math.round(v / totalVotes * 100) : 0;
+        const isVoted = myFactionVote === fid;
+        const card = document.createElement('div');
+        card.className = 'vote-card ia' + (isVoted ? ' voted' : '');
+        card.onclick = () => voteFacton(fid);
+        card.innerHTML =
+            `<div class="vote-card-title" style="color:${f.color};">${f.short}</div>` +
+            `<div class="vote-card-desc">${f.desc}</div>` +
+            `<div class="vote-bar-wrap">` +
+              `<div class="vote-bar-bg"><div class="vote-bar-fill" style="width:${pct}%;background:${f.color};"></div></div>` +
+              `<span class="vote-bar-count" style="color:${f.color};">${v}</span>` +
+            `</div>`;
+        el.appendChild(card);
+    }
+}
+
+function buildMapVoteCards() {
+    const el = document.getElementById('mapVoteCards');
+    if (!el) return;
+    el.innerHTML = '';
+    const MAP_DESCS = {
+        'WARZONE'     : 'Classic open battlefield. Wide lanes, full strategic freedom for both sides.',
+        'ARCHIPELAGO' : 'Each team owns an island. The only land route is a narrow bridge — control it or lose.',
+        'CHOKEPOINT'  : 'Wide home bases, but the midfield narrows to a tight land corridor flanked by water.',
+    };
+    const totalVotes = Object.values(mapTally).reduce((a, b) => a + b, 0);
+    for (const m of voteMapList) {
+        const v = mapTally[m.id] || 0;
+        const pct = totalVotes > 0 ? Math.round(v / totalVotes * 100) : 0;
+        const isVoted = myMapVote === m.id;
+        const card = document.createElement('div');
+        card.className = 'vote-card ia' + (isVoted ? ' voted' : '');
+        card.onclick = () => voteMap(m.id);
+        card.innerHTML =
+            `<div class="vote-card-title">${m.name}</div>` +
+            `<div class="vote-card-desc">${MAP_DESCS[m.name] || ''}</div>` +
+            `<div class="vote-bar-wrap">` +
+              `<div class="vote-bar-bg"><div class="vote-bar-fill" style="width:${pct}%;"></div></div>` +
+              `<span class="vote-bar-count">${v}</span>` +
+            `</div>`;
+        el.appendChild(card);
+    }
+}
+
+function voteFacton(fid) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    myFactionVote = fid;
+    ws.send(JSON.stringify({ t: 'vote', f: fid }));
+    buildFactionVoteCards();
+}
+
+function voteMap(mapId) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    myMapVote = mapId;
+    ws.send(JSON.stringify({ t: 'mvote', m: mapId }));
+    buildMapVoteCards();
+}
+
+function handleFactionVotes(d) {
+    // d.v is now just MY team's tally object (not [red, blue])
+    factionTally = d.v || {};
+    buildFactionVoteCards();
+}
+
+function handleMapVotes(d) {
+    // d.v is { mapId: count, ... }
+    const raw = d.v || {};
+    mapTally = {};
+    for (const [k, v] of Object.entries(raw)) mapTally[+k] = v;
+    buildMapVoteCards();
+}
+
+// ─── Event constants ──────────────────────────────────────────────────────────
+const EV = {
+    PHASE_CHANGE   : 0,
+    PLAYER_HIT     : 1,
+    PLAYER_DIE     : 2,
+    PLAYER_SPAWN   : 3,
+    PROJ_SPAWN     : 4,
+    PROJ_DESTROY   : 5,
+    BUILD_ADD      : 6,
+    BUILD_DESTROY  : 7,
+    BUILD_HIT      : 8,
+    CORE_HIT       : 9,
+    WIN            : 10,
+    NAMES          : 11,
+    RES_CHANGE     : 12,
+    PLAYER_LEAVE   : 13,
+    TURRET_UPGRADE : 14,
+    WALL_UPGRADE   : 15,
+};
+
+// ─── Faction definitions (mirrors server) ─────────────────────────────────────
+const FACTIONS = {
+    'roe': {
+        name: 'Revolutionaries of Earth', short: 'ROE',
+        wallCost: 8, turretCost: 25, hasUpgrades: true, baseTurret: 't', baseWall: 'w',
+        color: '#f59e0b',
+        desc: 'Jack of all trades. Cheap defenses, full upgrade tree. No clear weakness — no clear strength.',
+    },
+    'bgm': {
+        name: 'BlackenedGods Mining Corp', short: 'B.G.M. Corp',
+        wallCost: 15, turretCost: 35, hasUpgrades: true, baseTurret: 'bgm_t', baseWall: 'bgm_w',
+        color: '#f97316',
+        desc: 'Industrial powerhouse. Heavy costs, unique turret upgrade tree. Built like a fortress.',
+    },
+    'epa': {
+        name: 'Earthen Protection Agency', short: 'EPA',
+        wallCost: 12, turretCost: 28, hasUpgrades: true, baseTurret: 'epa_t', baseWall: 'epa_w',
+        color: '#22d3ee',
+        desc: 'Precision agency. Accurate, durable, expensive. Unique upgrade tree built for sustained defence.',
+    },
+};
+
+// ─── Faction runtime state (resolved at game start) ───────────────────────────
+const TURRET_DEFS = {
+    // ── ROE tree ──────────────────────────────────────────────────────────────
+    't':        { label: 'MK-I Defender',       cost: 0,  fireRate: 800,  dmg: 10, range: 400,
+                  desc: 'Balanced all-rounder. Good at everything.' },
+    't_mk2':    { label: 'MK-II Ranger',        cost: 40, fireRate: 650,  dmg: 12, range: 500, upgFrom: 't',
+                  desc: '+Range, +Accuracy. Still versatile.' },
+    't_mk3':    { label: 'MK-III Overseer',     cost: 60, fireRate: 550,  dmg: 15, range: 520, upgFrom: 't_mk2',
+                  desc: 'Elite: strong HP, reliable DPS.' },
+    't_supp':   { label: 'Suppressor',          cost: 40, fireRate: 300,  dmg: 5,  range: 350, upgFrom: 't',
+                  desc: 'High fire rate, slows enemies. Excellent vs swarms.', slow: true },
+    't_storm':  { label: 'Storm Suppressor',    cost: 60, fireRate: 240,  dmg: 5,  range: 360, upgFrom: 't_supp',
+                  desc: 'Dual barrels, stronger slow. Bullet rain! 🌧️', slow: true, dual: true },
+    't_break':  { label: 'Breaker Cannon',      cost: 50, fireRate: 1600, dmg: 40, range: 450, upgFrom: 't',
+                  desc: 'Slow shots, heavy kinetic damage, splash impact.', splash: 60 },
+    't_siege':  { label: 'Siege Breaker',       cost: 70, fireRate: 1400, dmg: 50, range: 460, upgFrom: 't_break',
+                  desc: 'Armor pen, shockwave splash, bonus vs structures.', splash: 85 },
+    // ── BGM Corp tree ─────────────────────────────────────────────────────────
+    'bgm_t':    { label: 'Excavator Node',      cost: 0,  fireRate: 1100, dmg: 22, range: 360,
+                  desc: 'Heavy mining-grade turret. Slow rotate, high durability, decent damage.' },
+    'bgm_drill':{ label: 'Drill Turret',        cost: 75, fireRate: 180,  dmg: 8,  range: 300, upgFrom: 'bgm_t',
+                  desc: 'Continuous drill beam. Shreds armor and buildings at close range.', drill: true },
+    'bgm_rail': { label: 'Rail Driver',         cost: 80, fireRate: 3200, dmg: 90, range: 750, upgFrom: 'bgm_t',
+                  desc: 'Industrial railgun. Massive burst, very slow reload, extreme range.' },
+    'bgm_molt': { label: 'Molten Projector',    cost: 70, fireRate: 1200, dmg: 15, range: 340, upgFrom: 'bgm_t',
+                  desc: 'Superheated slurry. Splash + burn DoT. Anti-swarm area denial.', burn: true, splash: 80 },
+    'bgm_qsn':  { label: 'Quarry Shield Node',  cost: 60, fireRate: 2000, dmg: 0,  range: 280, upgFrom: 'bgm_t',
+                  desc: 'Defensive utility. Pulses a shield field that slowly repairs nearby structures.', shield: true },
+    // ── EPA tree ──────────────────────────────────────────────────────────────
+    'epa_t':        { label: 'Aegis Platform',         cost: 0,   fireRate: 600,  dmg: 14, range: 480,
+                      desc: 'Accurate, durable, expensive. Standard precision defense.' },
+    'epa_mk2':      { label: 'Aegis Platform Mk-II',   cost: 55,  fireRate: 480,  dmg: 17, range: 530, upgFrom: 'epa_t',
+                      desc: 'Faster targeting, improved armor, slightly increased range.' },
+    'epa_mk3':      { label: 'Aegis Platform Mk-III',  cost: 75,  fireRate: 380,  dmg: 21, range: 580, upgFrom: 'epa_mk2',
+                      desc: 'Even faster targeting, greater armor, increased range.' },
+    'epa_fortress': { label: 'Aegis Fortress Node',    cost: 60,  fireRate: 550,  dmg: 16, range: 460, upgFrom: 'epa_t',
+                      desc: 'Dual targeting. Hardened chassis. 25% anti-projectile intercept.', dual: true, intercept: 0.25 },
+    'epa_knox':     { label: 'Aegis Knox Node',        cost: 80,  fireRate: 450,  dmg: 20, range: 480, upgFrom: 'epa_fortress',
+                      desc: 'Triple targeting. Strengthened chassis. 45% anti-projectile intercept.', dual: true, intercept: 0.45 },
+    'epa_dominion': { label: 'Aegis Dominion Battery', cost: 65,  fireRate: 500,  dmg: 18, range: 500, upgFrom: 'epa_t',
+                      desc: 'Linked-fire. Nearby EPA turrets gain 15% fire rate buff and adaptive targeting.', dominion: true },
+    'epa_citadel':  { label: 'Aegis Citadel Array',    cost: 120, fireRate: 280,  dmg: 28, range: 560, upgFrom: 'epa_t',
+                      desc: 'FINAL UPGRADE. Triple targets, mini shield projector, 30% intercept, devastating sustained defense.', intercept: 0.30, citadel: true },
+};
+const UPGRADE_PATHS = {
+    // ROE
+    't':           ['t_mk2', 't_supp', 't_break'],
+    't_mk2':       ['t_mk3'],
+    't_supp':      ['t_storm'],
+    't_break':     ['t_siege'],
+    // BGM
+    'bgm_t':       ['bgm_drill', 'bgm_rail', 'bgm_molt', 'bgm_qsn'],
+    // EPA
+    'epa_t':       ['epa_mk2', 'epa_fortress', 'epa_dominion', 'epa_citadel'],
+    'epa_mk2':     ['epa_mk3'],
+    'epa_fortress':['epa_knox'],
+};
+
+// ── Wall upgrade trees (client mirror) ───────────────────────────────────────
+const WALL_DEFS = {
+    // ROE
+    'w':              { label: 'Field Barricade',         desc: 'Cheap practical wall.' },
+    'w_reinforced':   { label: 'Reinforced Barricade',    desc: '+More HP, reduced explosive damage, cheap repair cost.',
+                        cost: 20, upgFrom: 'w',
+                        perks: ['More HP', 'Reduced explosive damage', 'Cheap repair cost'] },
+    // BGM
+    'bgm_w':          { label: 'Excavation Barrier',      desc: 'Heavy mining-grade plating. Tougher than standard walls.' },
+    'bgm_w_blast':    { label: 'Blast Wall',              desc: 'Extreme explosive resistance + shock absorption.',
+                        cost: 25, upgFrom: 'bgm_w',
+                        perks: ['Extreme explosive resistance', 'Shock absorption'] },
+    'bgm_w_thermal':  { label: 'Thermal Wall',            desc: 'Reflects partial energy damage back at attackers. Damages nearby enemies.',
+                        cost: 25, upgFrom: 'bgm_w',
+                        perks: ['Reflects 25% damage on hit', 'Burns nearby enemies every 3s'] },
+    'bgm_w_anchor':   { label: 'Anchor Wall',             desc: 'Absurd HP. An immobile bunker. Nothing gets through.',
+                        cost: 35, upgFrom: 'bgm_w',
+                        perks: ['Massive HP pool', 'Immovable bunker plating'] },
+    'bgm_w_conduit':  { label: 'Conduit Wall',            desc: 'Pulses energy to nearby B.G.M. structures, slowly regenerating their HP.',
+                        cost: 30, upgFrom: 'bgm_w',
+                        perks: ['Heals nearby BGM structures every 3s'] },
+    // ── EPA walls — single linear chain ──────────────────────────────────────
+    'epa_w':           { label: 'Defense Panel',           desc: 'Standard EPA precision wall plating.' },
+    'epa_w_fort':      { label: 'Fortified Defense Panel', desc: 'Stronger plating, projectile resistance.',
+                        cost: 22, upgFrom: 'epa_w',
+                        perks: ['Stronger plating', 'Projectile resistance'] },
+    'epa_w_bulwark':   { label: 'Bulwark Segment',         desc: 'Embedded repair systems. Slowly regenerates HP.',
+                        cost: 35, upgFrom: 'epa_w_fort',
+                        perks: ['Embedded repair systems', 'Slow HP regeneration'] },
+    'epa_w_guardian':  { label: 'Guardian Segment',        desc: 'Integrated anti-projectile system. Reduced splash damage intake.',
+                        cost: 45, upgFrom: 'epa_w_bulwark',
+                        perks: ['20% anti-projectile intercept', 'Reduced splash damage intake'] },
+    'epa_w_citadel':   { label: 'Citadel Segment',         desc: 'Shielded surface. Nearby EPA walls gain a defense bonus.',
+                        cost: 55, upgFrom: 'epa_w_guardian',
+                        perks: ['Shielded surface', '30% intercept', 'Nearby EPA walls gain defense aura'] },
+    'epa_w_bastion':   { label: 'Bastion Segment',         desc: 'Final form. Massive HP, energy reinforcement, partial damage sharing with nearby walls.',
+                        cost: 70, upgFrom: 'epa_w_citadel',
+                        perks: ['Massive HP', 'Energy reinforcement (high resist)', '40% intercept', 'Shares 20% damage to nearby EPA walls'] },
+};
+const WALL_UPGRADE_PATHS = {
+    // ROE
+    'w':              ['w_reinforced'],
+    'w_reinforced':   [],
+    // BGM
+    'bgm_w':          ['bgm_w_blast', 'bgm_w_thermal', 'bgm_w_anchor', 'bgm_w_conduit'],
+    'bgm_w_blast':    [],
+    'bgm_w_thermal':  [],
+    'bgm_w_anchor':   [],
+    // EPA — linear chain
+    'epa_w':           ['epa_w_fort'],
+    'epa_w_fort':      ['epa_w_bulwark'],
+    'epa_w_bulwark':   ['epa_w_guardian'],
+    'epa_w_guardian':  ['epa_w_citadel'],
+    'epa_w_citadel':   ['epa_w_bastion'],
+    'epa_w_bastion':   [],
+};
+
+// ─── Input state ──────────────────────────────────────────────────────────────
+const keys  = { w: false, a: false, s: false, d: false };
+const mouse = { x: 0, y: 0, wx: 0, wy: 0, down: false };
+let   currentBuild  = null;
+let   selectedTurret = null;   // id of friendly turret being inspected for upgrade
+let   selectedWall   = null;   // id of friendly wall being inspected for upgrade
+let   lastSentInput = { dx: 0, dy: 0, a: 0, sh: 0 };
+let   lastInputAt   = 0;
+
+// ─── Camera ───────────────────────────────────────────────────────────────────
+const cam = { x: 1500, y: 700 };
+const CAM_ZOOM  = 0.52;   // zoom out to show more of the larger map
+const GRID_SIZE     = 16;     // building snap grid
+const WALL_W        = 50;     // wall collision box width/height (matches server)
+const WALL_HALF     = 25;     // WALL_W / 2
+const TURRET_COLL_R = 18;     // turret collision radius (matches server)
+
+// Returns canvas rotation so the enemy core is always at the top of the screen.
+// Red (team 0): enemy is on the right side → rotate -90° (right → up)
+// Blue (team 1): enemy is on the left side → rotate +90° (left → up)
+function getCamRotation() {
+    if (myState.team === 0) return -Math.PI / 2;
+    if (myState.team === 1) return  Math.PI / 2;
+    return 0;
+}
+
+function snapToGrid(v) { return Math.round(v / GRID_SIZE) * GRID_SIZE; }
+
+// ─── Canvas resize ────────────────────────────────────────────────────────────
+function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+window.addEventListener('resize', resize);
+resize();
+
+// ─── WebSocket ────────────────────────────────────────────────────────────────
+let ws;
+
+document.getElementById('btnPlay').addEventListener('click', () => {
+    showScreen('matchmake');
+});
+
+document.getElementById('btnBack').addEventListener('click', () => {
+    if (ws) { ws.close(); ws = null; }
+    showScreen('start');
+});
+
+document.getElementById('chatSendBtn').addEventListener('click', sendChat);
+document.getElementById('chatInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') sendChat();
+});
+
+// In-game chat bar listeners (elements always exist after DOM load)
+document.getElementById('gameChatInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); sendGameChat();  }
+    if (e.key === 'Escape') { e.preventDefault(); closeGameChat(); }
+    e.stopPropagation(); // prevent reaching the global keydown handler
+});
+
+document.getElementById('btnJoin').addEventListener('click', () => {
+    const addr = 'https://core-wars-backend.onrender.com';
+    myState.name = document.getElementById('pName').value || 'Pilot';
+    setStatus('Connecting…', 'yellow');
+    try { ws = new WebSocket(addr); } catch { setStatus('Invalid URL.', 'red'); return; }
+
+    ws.onopen = () => {
+        ws.send(JSON.stringify({
+            t: 'join',
+            n: myState.name,
+            r: document.getElementById('rCode').value || null,
+        }));
+        setStatus('Waiting for server…', 'yellow');
+    };
+
+    ws.onmessage = (evt) => {
+        const data = JSON.parse(evt.data);
+        switch (data.t) {
+            case 'init'       : handleInit(data);         break;
+            case 'names'      : handleNames(data);        break;
+            case 'start'      : handleStart(data);        break;
+            case 's'          : handleSnapshot(data);     break;
+            case 'chat'       : handleChatMsg(data);      break;
+            case 'lobbystate' : handleLobbyState(data);   break;
+            case 'fvotes'     : handleFactionVotes(data); break;
+            case 'mvotes'     : handleMapVotes(data);     break;
+            case 'votestart'  : handleVoteStart(data);    break;
+            case 'votetick'   : handleVoteTick(data);     break;
+            case 'err'        : setStatus(data.msg, 'red'); break;
+        }
+    };
+
+    ws.onerror = () => setStatus('Connection error.', 'red');
+
+    ws.onclose = () => {
+        if ($lobbyScreen.classList.contains('hidden') && $hudTop.classList.contains('hidden')) return;
+        showScreen('start');
+        setStatus('Connection lost.', 'red');
+        myId = null; myRoomId = null;
+        playerNames.clear();
+        remoteState.clear();
+        chatMessages = [];
+        if (inputSendInterval) { clearInterval(inputSendInterval); inputSendInterval = null; }
+    };
+});
+
+function setStatus(msg, color) {
+    $connStatus.innerText = msg;
+    const cols = { red:'#ef4444', yellow:'#f59e0b', green:'#22c55e', gray:'#94a3b8', blue:'#3b82f6' };
+    $connStatus.style.color = cols[color] || '#94a3b8';
+}
+
+// ─── Message handlers ─────────────────────────────────────────────────────────
+function handleInit(d) {
+    myId      = d.id;
+    myRoomId  = d.r;
+    mapData   = { mw: d.mw, mh: d.mh };
+    coreData  = d.cores;
+    mapWaterZones = d.wz   || [];
+    mapSpawns     = d.spawns || mapSpawns;
+    mapName       = d.mapName || '';
+
+    myState.x    = d.x;
+    myState.y    = d.y;
+    myState.team = d.team;
+
+    cam.x = d.x;
+    cam.y = d.y;
+    updateWorldMouse();
+
+    localBuildings.clear();
+    for (const b of d.blds) localBuildings.set(b.i, b);
+
+    playerNames.clear();
+    remoteState.clear();
+    chatMessages = [];
+    document.getElementById('chatLog').innerHTML = '';
+    document.getElementById('playerList').innerHTML = '';
+
+    // Seed self into playerNames so lobby renders before 'names' arrives
+    playerNames.set(myId, { nm: myState.name, tm: myState.team });
+
+    document.getElementById('lobbyRoomCode').textContent = d.r || '—';
+    const badge = document.getElementById('myTeamBadge');
+    badge.classList.remove('hidden');
+    if (myState.team === 0) {
+        badge.className = 'team-badge red';
+        badge.textContent = '🔴 RED TEAM';
+    } else {
+        badge.className = 'team-badge blue';
+        badge.textContent = '🔵 BLUE TEAM';
+    }
+    rebuildLobbyPlayers();
+    addChatMessage(null, `You joined as ${myState.team === 0 ? '🔴 Red' : '🔵 Blue'} team. Room: ${d.r}`, -1, false, true);
+
+    // Reset vote/ready state for this session
+    myReadyState  = null;
+    myFactionVote = null;
+    myMapVote     = null;
+    factionTally  = {};
+    mapTally      = {};
+    teamFactions  = ['roe', 'roe'];
+    updateReadyBtn();
+
+    showScreen('lobby');
+    setStatus('', 'gray');
+
+    if (!renderStarted) {
+        renderStarted = true;
+        requestAnimationFrame(renderLoop);
+    }
+    if (inputSendInterval) clearInterval(inputSendInterval);
+    inputSendInterval = setInterval(sendInput, 1000 / 30);
+}
+
+// 'names' replaces the old per-snapshot nm/tm fields — sent once on join/leave
+function handleNames(d) {
+    const incoming = new Set();
+    for (const p of d.n) {
+        incoming.add(p.i);
+        const prev = playerNames.get(p.i) || {};
+        playerNames.set(p.i, { nm: p.nm, tm: p.tm, rd: p.rd });
+        if (!remoteState.has(p.i) && p.i !== myId) {
+            remoteState.set(p.i, { hp: 100, rt: 0 });
+        }
+    }
+    for (const id of playerNames.keys()) {
+        if (!incoming.has(id)) {
+            playerNames.delete(id);
+            remoteState.delete(id);
+            interpBufs.delete(id);
+        }
+    }
+    if (!$lobbyScreen.classList.contains('hidden')) rebuildLobbyPlayers();
+}
+
+function handleStart(d) {
+    currentPhase = d.ph;
+    currentTimer = d.tm;
+    timerBaseValue  = d.tm;
+    timerReceivedAt = performance.now();
+    coreHPs      = d.cHps;
+    if (d.wz)     mapWaterZones = d.wz;
+    if (d.spawns) mapSpawns     = d.spawns;
+    if (d.mapName) mapName      = d.mapName;
+
+    // Apply resolved factions
+    if (d.fcts) teamFactions = d.fcts;
+    const myFaction = FACTIONS[teamFactions[myState.team]] || FACTIONS['roe'];
+    const wc = document.getElementById('wallCostDisplay');
+    const tc = document.getElementById('turretCostDisplay');
+    if (wc) wc.textContent = myFaction.wallCost;
+    if (tc) tc.textContent = myFaction.turretCost;
+
+    localBuildings.clear();
+    localProjectiles.clear();
+    interpBufs.clear();
+    remoteState.clear();
+
+    // Re-seed remoteState for everyone in the room
+    for (const [id, p] of playerNames) {
+        if (id !== myId) remoteState.set(id, { hp: 100, rt: 0 });
+    }
+
+    const spawn = mapSpawns[myState.team] || { x: myState.team === 0 ? 380 : mapData.mw - 380, y: mapData.mh / 2 };
+    myState.x   = spawn.x;
+    myState.y   = spawn.y;
+    myState.hp  = myState.maxHp;
+    myState.rt  = 0;
+    myState.res = 150;
+    serverRes   = 150;
+    scrapAccum  = 0;
+
+    $gameOver.classList.add('hidden');
+
+    // Clear vote state
+    myReadyState  = null;
+    myFactionVote = null;
+    myMapVote     = null;
+    chatBubbles.clear();
+
+    // Show faction announcement in chat area
+    const mf = FACTIONS[teamFactions[myState.team]] || FACTIONS['roe'];
+    const ef = FACTIONS[teamFactions[1 - myState.team]] || FACTIONS['roe'];
+    addChatMessage(null, `Your faction: ${mf.name} (${mf.short}) · Enemy: ${ef.name} (${ef.short})`, -1, false, true);
+
+    showScreen('game');
+    updateUI();
+}
+
+function handleSnapshot(d) {
+    // Phase and timer are now delta — only sent when they change
+    if (d.ph !== undefined) currentPhase = d.ph;
+    if (d.tm !== undefined) {
+        currentTimer    = d.tm;
+        timerBaseValue  = d.tm;
+        timerReceivedAt = performance.now();
+    }
+    if (d.c)  { coreHPs[0] = d.c[0]; coreHPs[1] = d.c[1]; }
+
+    // d.p is now a DELTA list — only players who moved this interval
+    if (d.p && d.p.length) {
+        // Reconcile self if present; update interp bufs for others
+        const me = d.p.find(p => p.i === myId);
+        if (me) reconcile(me);
+        updateInterp(d.p);
+    }
+
+    if (d.ev && d.ev.length) processEvents(d.ev);
+
+    updateUI();
+}
+
+function handleChatMsg(d) {
+    if (d.id && d.id === myId) return;
+    addChatMessage(d.nm || 'Unknown', d.msg, d.team !== undefined ? d.team : -1);
+    // Show bubble above the sender's sprite
+    if (d.id) {
+        chatBubbles.set(d.id, { msg: d.msg, expireAt: performance.now() + 4500 });
+    }
+}
+
+// ─── Prediction & reconciliation ──────────────────────────────────────────────
+// Snapshot now only carries position (x,y) and angle byte (a).
+// hp / rt / res are event-driven — not touched here.
+function reconcile(serverP) {
+    const dx  = serverP.x - myState.x;
+    const dy  = serverP.y - myState.y;
+    const err = Math.hypot(dx, dy);
+
+    if (err > 40) {
+        // Large gap — hard snap immediately (e.g. respawn, wall pushback)
+        myState.x = serverP.x;
+        myState.y = serverP.y;
+    } else if (err > 2) {
+        // Small drift — correct 60% per frame so it resolves in ~2 frames, not 10+
+        myState.x += dx * 0.6;
+        myState.y += dy * 0.6;
+    }
+    // ≤ 2px: sub-pixel noise, ignore entirely to avoid micro-jitter
+}
+
+// ─── Remote interpolation ─────────────────────────────────────────────────────
+// Delta update: only merge entries for players present in this snapshot slice.
+function updateInterp(deltaPlayers) {
+    const now = performance.now();
+
+    for (const sp of deltaPlayers) {
+        if (sp.i === myId) continue;
+        if (!interpBufs.has(sp.i)) interpBufs.set(sp.i, []);
+        const buf = interpBufs.get(sp.i);
+
+        // Decode compressed angle byte back to radians
+        const angle = decodeAngle(sp.a);
+
+        // Carry forward hp/rt/tm/nm from last buf entry (events keep them fresh)
+        const prev = buf.length ? buf[buf.length - 1] : null;
+        buf.push({
+            t: now,
+            i: sp.i,
+            x: sp.x,
+            y: sp.y,
+            a: angle,
+        });
+        if (buf.length > 6) buf.shift();
+    }
+}
+
+function getInterpolatedPlayers() {
+    const renderTime = performance.now() - INTERP_DELAY;
+    const out = [];
+
+    for (const [id, buf] of interpBufs) {
+        if (!buf.length) continue;
+
+        let prev = buf[0], next = buf[buf.length - 1];
+        for (let i = 0; i < buf.length - 1; i++) {
+            if (buf[i].t <= renderTime && buf[i+1].t >= renderTime) {
+                prev = buf[i]; next = buf[i+1];
+                break;
+            }
+        }
+
+        const rs  = remoteState.get(id) || { hp: 100, rt: 0 };
+        const pn  = playerNames.get(id)  || { nm: '', tm: -1 };
+
+        if (rs.rt > 0) continue;  // dead — skip drawing
+
+        if (prev === next || next.t === prev.t) {
+            out.push({ ...next, hp: rs.hp, rt: rs.rt, nm: pn.nm, tm: pn.tm });
+            continue;
+        }
+
+        const alpha = Math.max(0, Math.min(1, (renderTime - prev.t) / (next.t - prev.t)));
+        out.push({
+            i:  id,
+            nm: pn.nm,
+            tm: pn.tm,
+            x:  prev.x + (next.x - prev.x) * alpha,
+            y:  prev.y + (next.y - prev.y) * alpha,
+            a:  lerpAngle(prev.a, next.a, alpha),
+            hp: rs.hp,
+            rt: rs.rt,
+        });
+    }
+    return out;
+}
+
+function lerpAngle(a, b, t) {
+    let d = b - a;
+    while (d >  Math.PI) d -= 2 * Math.PI;
+    while (d < -Math.PI) d += 2 * Math.PI;
+    return a + d * t;
+}
+
+// ─── Event processing ─────────────────────────────────────────────────────────
+function processEvents(evs) {
+    for (const ev of evs) {
+        switch (ev.e) {
+            case EV.PHASE_CHANGE:
+                currentPhase = ev.ph;
+                if (currentBuild) selectBuild(null);
+                if (selectedTurret) { selectedTurret = null; hideUpgradePanel(); }
+                if (selectedWall)   { selectedWall   = null; hideWallUpgradePanel(); }
+                break;
+
+            case EV.PLAYER_HIT: {
+                if (ev.i === myId) {
+                    myState.hp = ev.hp;
+                    if (ev.pt === 'bgm_molt') myState.burnUntil = performance.now() + 3000;
+                } else {
+                    const rs = remoteState.get(ev.i);
+                    if (rs) rs.hp = ev.hp;
+                }
+                break;
+            }
+
+            case EV.PLAYER_DIE: {
+                if (ev.i === myId) {
+                    myState.hp = 0;
+                    myState.rt = 5;  // client predicts countdown locally
+                } else {
+                    const rs = remoteState.get(ev.i);
+                    if (rs) { rs.hp = 0; rs.rt = 5; }
+                }
+                break;
+            }
+
+            case EV.PLAYER_SPAWN:
+                if (ev.i === myId) {
+                    myState.x  = ev.x;
+                    myState.y  = ev.y;
+                    myState.hp = ev.hp;
+                    myState.rt = 0;
+                    myState.burnUntil = 0;
+                } else {
+                    const rs = remoteState.get(ev.i);
+                    if (rs) { rs.hp = ev.hp; rs.rt = 0; }
+                    // Seed interp buf at spawn position
+                    interpBufs.set(ev.i, [{
+                        t: performance.now(),
+                        i: ev.i, x: ev.x, y: ev.y, a: 0,
+                    }]);
+                }
+                break;
+
+            case EV.PROJ_SPAWN:
+                localProjectiles.set(ev.i, {
+                    x: ev.x, y: ev.y, a: ev.a,
+                    spd: ev.spd, r: ev.r, team: ev.tm,
+                    pt: ev.pt || 't',
+                    t0: performance.now(),
+                });
+                break;
+
+            case EV.PROJ_DESTROY:
+                localProjectiles.delete(ev.i);
+                break;
+
+            case EV.BUILD_ADD:
+                localBuildings.set(ev.b.i, ev.b);
+                break;
+
+            case EV.BUILD_DESTROY:
+                localBuildings.delete(ev.i);
+                if (selectedTurret === ev.i) { selectedTurret = null; hideUpgradePanel(); }
+                if (selectedWall   === ev.i) { selectedWall   = null; hideWallUpgradePanel(); }
+                break;
+
+            case EV.BUILD_HIT: {
+                const b = localBuildings.get(ev.i);
+                if (b) b.hp = ev.hp;
+                break;
+            }
+
+            case EV.TURRET_UPGRADE: {
+                const b = localBuildings.get(ev.i);
+                if (b) { b.st = ev.st; b.hp = ev.hp; b.mhp = ev.mhp; }
+                if (selectedTurret === ev.i) updateUpgradePanel();
+                break;
+            }
+
+            case EV.WALL_UPGRADE: {
+                const b = localBuildings.get(ev.i);
+                if (b) { b.st = ev.st; b.hp = ev.hp; b.mhp = ev.mhp; }
+                if (selectedWall === ev.i) updateWallUpgradePanel();
+                break;
+            }
+
+            case EV.CORE_HIT:
+                coreHPs[ev.id] = ev.hp;
+                break;
+
+            case EV.WIN:
+                gameWinner   = ev.w;
+                currentPhase = 3;
+                showGameOver(ev.w);
+                break;
+
+            case EV.RES_CHANGE:
+                if (ev.i === myId) {
+                    serverRes  = ev.r;
+                    scrapAccum = 0;          // restart accumulator from the new server baseline
+                    myState.res = ev.r;
+                    if (selectedTurret) updateUpgradePanel();   // refresh affordability
+                    if (selectedWall)   updateWallUpgradePanel();
+                }
+                break;
+
+            case EV.PLAYER_LEAVE:
+                interpBufs.delete(ev.i);
+                remoteState.delete(ev.i);
+                // playerNames is cleaned up by the subsequent 'names' broadcast
+                break;
+        }
+    }
+}
+
+// ─── Input sending ────────────────────────────────────────────────────────────
+// Converts WASD screen-space intent into world-space dx/dy.
+// The camera is rotated so the enemy is always at the top, so W always
+// means "move toward the enemy" regardless of team.
+function getWorldMovement() {
+    let sx = 0, sy = 0;
+    if (keys.w) sy -= 1;
+    if (keys.s) sy += 1;
+    if (keys.a) sx -= 1;
+    if (keys.d) sx += 1;
+
+    const rot = getCamRotation();
+    const c = Math.cos(rot), s = Math.sin(rot);
+    // Un-rotate screen direction into world direction
+    let dx = sx * c + sy * s;
+    let dy = -sx * s + sy * c;
+    const len = Math.hypot(dx, dy);
+    if (len > 1) { dx /= len; dy /= len; }
+    return { dx, dy };
+}
+
+function sendInput() {
+    if (!ws || ws.readyState !== WebSocket.OPEN || !myId) return;
+
+    const { dx, dy } = getWorldMovement();
+    const angle = +myState.a.toFixed(4);
+    const sh    = (mouse.down && !currentBuild) ? 1 : 0;
+
+    const changed =
+        dx !== lastSentInput.dx ||
+        dy !== lastSentInput.dy ||
+        Math.abs(angle - lastSentInput.a) > 0.12 ||
+        sh !== lastSentInput.sh;
+
+    const now = performance.now();
+    if (!changed && now - lastInputAt < 100) return;
+
+    ws.send(JSON.stringify({ t: 'i', dx, dy, a: angle, sh }));
+    lastSentInput = { dx, dy, a: angle, sh };
+    lastInputAt   = now;
+}
+
+// ─── Build selection ──────────────────────────────────────────────────────────
+function selectBuild(type) {
+    currentBuild = type;
+    if (type) { selectedTurret = null; hideUpgradePanel(); selectedWall = null; hideWallUpgradePanel(); }
+    document.getElementById('btnWall').classList.toggle('sel', type === 'w');
+    document.getElementById('btnTurret').classList.toggle('sel', type === 't');
+    canvas.style.cursor = type ? 'crosshair' : 'default';
+}
+
+function deselectTurret() {
+    selectedTurret = null;
+    hideUpgradePanel();
+}
+
+function deselectWall() {
+    selectedWall = null;
+    hideWallUpgradePanel();
+}
+
+function sendWallUpgrade(wallId, toType) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ t: 'wupg', id: wallId, to: toType }));
+}
+
+function updateWallUpgradePanel() {
+    const b = localBuildings.get(selectedWall);
+    if (!b || b.tp !== 'w') { hideWallUpgradePanel(); return; }
+
+    const myFaction = FACTIONS[teamFactions[myState.team]] || FACTIONS['roe'];
+    const subtype = b.st || 'w';
+    const def     = WALL_DEFS[subtype];
+    const paths   = myFaction.hasUpgrades ? (WALL_UPGRADE_PATHS[subtype] || []) : [];
+
+    // Per-subtype stat badge labels
+    const statBadges = {
+        'w_reinforced':   '<b style="color:#86efac">EXPLO RESIST</b>',
+        'bgm_w_blast':    '<b style="color:#f97316">EXPLO RESIST ✦✦</b> &nbsp;·&nbsp; <b style="color:#fbbf24">SHOCK ABS</b>',
+        'bgm_w_thermal':  '<b style="color:#ef4444">THERMAL</b> &nbsp;·&nbsp; <b style="color:#fb923c">REFLECTS DMG</b>',
+        'bgm_w_anchor':   '<b style="color:#f97316">EXTREME HP</b> &nbsp;·&nbsp; <b style="color:#fbbf24">BUNKER</b>',
+        'bgm_w_conduit':  '<b style="color:#86efac">CONDUIT PULSE</b>',
+        'epa_w_fort':     '<b style="color:#22d3ee">PROJ RESIST</b>',
+        'epa_w_bulwark':  '<b style="color:#22d3ee">PROJ RESIST</b> &nbsp;·&nbsp; <b style="color:#86efac">REGEN</b>',
+        'epa_w_guardian': '<b style="color:#a78bfa">INTERCEPT 20%</b> &nbsp;·&nbsp; <b style="color:#22d3ee">SPLASH RESIST</b>',
+        'epa_w_citadel':  '<b style="color:#a78bfa">INTERCEPT 30%</b> &nbsp;·&nbsp; <b style="color:#22d3ee">SHIELD AURA</b>',
+        'epa_w_bastion':  '<b style="color:#f59e0b">INTERCEPT 40%</b> &nbsp;·&nbsp; <b style="color:#f59e0b">DMG SHARE</b> &nbsp;·&nbsp; <b style="color:#22d3ee">MASSIVE HP</b>',
+    };
+
+    document.getElementById('wallUpgPanelName').textContent = def ? def.label.toUpperCase() : subtype.toUpperCase();
+    document.getElementById('wallUpgPanelStats').innerHTML =
+        `HP: <b style="color:rgba(255,255,255,0.7)">${b.hp} / ${b.mhp}</b>` +
+        (statBadges[subtype] ? ` &nbsp;·&nbsp; ${statBadges[subtype]}` : '');
+
+    const optEl = document.getElementById('wallUpgPanelOptions');
+    optEl.innerHTML = '';
+
+    if (!myFaction.hasUpgrades) {
+        const el = document.createElement('div');
+        el.className = 'upg-max';
+        el.style.color = myFaction.color;
+        el.textContent = `✦ ${myFaction.short} — No Upgrades Available ✦`;
+        optEl.appendChild(el);
+    } else if (paths.length === 0) {
+        const el = document.createElement('div');
+        el.className = 'upg-max';
+        el.textContent = '★ MAX UPGRADE ★';
+        optEl.appendChild(el);
+    } else {
+        // BGM wall paths each get their own accent colour
+        const wallPathCols = {
+            'w_reinforced':   '#86efac',
+            'bgm_w_blast':    '#f97316',
+            'bgm_w_thermal':  '#ef4444',
+            'bgm_w_anchor':   '#fbbf24',
+            'bgm_w_conduit':  '#86efac',
+            'epa_w_fort':     '#22d3ee',
+            'epa_w_bulwark':  '#06b6d4',
+            'epa_w_guardian': '#a78bfa',
+            'epa_w_citadel':  '#818cf8',
+            'epa_w_bastion':  '#f59e0b',
+        };
+
+        for (const path of paths) {
+            const pd = WALL_DEFS[path];
+            const canAfford = myState.res >= pd.cost;
+            const pathCol = wallPathCols[path] || '#86efac';
+
+            const btn = document.createElement('button');
+            btn.className = 'upg-btn ia' + (canAfford ? '' : ' cant-afford');
+            btn.style.cssText =
+                `border: 1.5px solid ${canAfford ? pathCol + '55' : 'rgba(255,255,255,0.07)'};` +
+                `background: ${canAfford ? pathCol + '14' : 'rgba(255,255,255,0.02)'};`;
+
+            const perksHtml = pd.perks
+                ? pd.perks.map(p =>
+                    `<div style="display:flex;align-items:baseline;gap:5px;margin-top:3px;">` +
+                    `<span style="color:${canAfford ? pathCol : 'rgba(255,255,255,0.2)'};font-size:13px;">▸</span>` +
+                    `<span style="font-family:'Barlow',sans-serif;font-size:14px;color:${canAfford ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)'};">${p}</span>` +
+                    `</div>`).join('')
+                : '';
+
+            btn.innerHTML =
+                `<div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;` +
+                `letter-spacing:1px;color:${canAfford ? pathCol : 'rgba(255,255,255,0.3)'};margin-bottom:2px;">${pd.label}</div>` +
+                `<div style="font-family:'Bebas Neue',sans-serif;font-size:21px;color:${canAfford ? '#f59e0b' : 'rgba(245,158,11,0.3)'};">${pd.cost} ⬡</div>` +
+                perksHtml;
+            if (canAfford) btn.onclick = () => sendWallUpgrade(b.i, path);
+            optEl.appendChild(btn);
+        }
+    }
+    document.getElementById('wallUpgradePanel').classList.remove('hidden');
+}
+
+function hideWallUpgradePanel() {
+    document.getElementById('wallUpgradePanel').classList.add('hidden');
+}
+
+function sendUpgrade(buildId, toType) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ t: 'upg', id: buildId, to: toType }));
+}
+
+function updateUpgradePanel() {
+    const b = localBuildings.get(selectedTurret);
+    if (!b || b.tp !== 't') { hideUpgradePanel(); return; }
+
+    const myFaction = FACTIONS[teamFactions[myState.team]] || FACTIONS['roe'];
+    const subtype = b.st || 't';
+    const def     = TURRET_DEFS[subtype];
+    const paths   = myFaction.hasUpgrades ? (UPGRADE_PATHS[subtype] || []) : [];
+
+    document.getElementById('upgPanelName').textContent = def ? def.label.toUpperCase() : subtype.toUpperCase();
+    const rateStr = def ? (1000 / def.fireRate).toFixed(1) + '/s' : '?';
+    document.getElementById('upgPanelStats').innerHTML =
+        `Rate: <b style="color:rgba(255,255,255,0.7)">${rateStr}</b> &nbsp;·&nbsp; ` +
+        `Dmg: <b style="color:rgba(255,255,255,0.7)">${def ? def.dmg : '?'}</b> &nbsp;·&nbsp; ` +
+        `Range: <b style="color:rgba(255,255,255,0.7)">${def ? def.range : '?'}</b>` +
+        (def && def.slow         ? ' &nbsp;·&nbsp; <b style="color:#fb923c">SLOWS</b>'         : '') +
+        (def && def.dual         ? ' &nbsp;·&nbsp; <b style="color:#facc15">DUAL</b>'          : '') +
+        (def && def.splash       ? ` &nbsp;·&nbsp; <b style="color:#f97316">SPLASH ${def.splash}</b>` : '') +
+        (def && def.drill        ? ' &nbsp;·&nbsp; <b style="color:#ef4444">DRILL BEAM</b>'    : '') +
+        (def && def.burn         ? ' &nbsp;·&nbsp; <b style="color:#f97316">BURN DoT</b>'      : '') +
+        (def && def.shield       ? ' &nbsp;·&nbsp; <b style="color:#86efac">SHIELD PULSE</b>'  : '') +
+        (def && def.bonusVsBldg  ? ' &nbsp;·&nbsp; <b style="color:#fbbf24">+vs BLDG</b>'     : '') +
+        (def && def.intercept    ? ` &nbsp;·&nbsp; <b style="color:#a78bfa">INTERCEPT ${Math.round(def.intercept*100)}%</b>` : '') +
+        (def && def.dominion     ? ' &nbsp;·&nbsp; <b style="color:#34d399">DOMINION AURA</b>' : '') +
+        (def && def.citadel      ? ' &nbsp;·&nbsp; <b style="color:#f59e0b">CITADEL</b>'       : '');
+
+    const optEl = document.getElementById('upgPanelOptions');
+    optEl.innerHTML = '';
+
+    if (!myFaction.hasUpgrades) {
+        const el = document.createElement('div');
+        el.className = 'upg-max';
+        const fc = myFaction.color;
+        el.style.color = fc;
+        el.textContent = `✦ ${myFaction.short} — No Upgrades Available ✦`;
+        optEl.appendChild(el);
+    } else if (paths.length === 0) {
+        const el = document.createElement('div');
+        el.className = 'upg-max';
+        el.textContent = '★ MAX UPGRADE ★';
+        optEl.appendChild(el);
+    } else {
+        for (const path of paths) {
+            const pd = TURRET_DEFS[path];
+            const canAfford = myState.res >= pd.cost;
+
+            // colour accent per upgrade path
+            const pathCol = {
+                // ROE
+                't_mk2':       '#38bdf8', 't_mk3':        '#0ea5e9',
+                't_supp':      '#fb923c', 't_storm':       '#ef4444',
+                't_break':     '#facc15', 't_siege':       '#f59e0b',
+                // BGM
+                'bgm_drill':   '#ef4444', 'bgm_rail':      '#fbbf24',
+                'bgm_molt':    '#f97316', 'bgm_qsn':       '#86efac',
+                // EPA
+                'epa_mk2':     '#22d3ee', 'epa_mk3':       '#06b6d4',
+                'epa_fortress':'#a78bfa', 'epa_knox':      '#7c3aed',
+                'epa_dominion':'#34d399', 'epa_citadel':   '#f59e0b',
+            }[path] || '#94a3b8';
+
+            const btn = document.createElement('button');
+            btn.className = 'upg-btn ia' + (canAfford ? '' : ' cant-afford');
+            btn.style.cssText =
+                `border: 1.5px solid ${canAfford ? pathCol + '55' : 'rgba(255,255,255,0.07)'};` +
+                `background: ${canAfford ? pathCol + '14' : 'rgba(255,255,255,0.02)'};`;
+            btn.innerHTML =
+                `<div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;` +
+                `letter-spacing:1px;color:${canAfford ? pathCol : 'rgba(255,255,255,0.3)'};margin-bottom:2px;">${pd.label}</div>` +
+                `<div style="font-family:'Bebas Neue',sans-serif;font-size:21px;color:${canAfford ? '#f59e0b' : 'rgba(245,158,11,0.3)'};">${pd.cost} ⬡</div>` +
+                `<div style="font-family:'Barlow',sans-serif;font-size:14px;color:rgba(255,255,255,0.28);margin-top:3px;line-height:1.35;">${pd.desc}</div>`;
+            if (canAfford) btn.onclick = () => sendUpgrade(b.i, path);
+            optEl.appendChild(btn);
+        }
+    }
+    document.getElementById('upgradePanel').classList.remove('hidden');
+}
+
+function hideUpgradePanel() {
+    document.getElementById('upgradePanel').classList.add('hidden');
+}
+
+// ─── Raw input events ─────────────────────────────────────────────────────────
+window.addEventListener('keydown', e => {
+    // In-game chat open/close/send
+    const inGame = document.getElementById('hud-top') && !document.getElementById('hud-top').classList.contains('hidden');
+    if (inGame) {
+        if (!gameChatOpen && e.key === 'Enter' && document.activeElement !== document.getElementById('gameChatInput')) {
+            e.preventDefault();
+            openGameChat();
+            return;
+        }
+        if (gameChatOpen) {
+            if (e.key === 'Escape') { e.preventDefault(); closeGameChat(); return; }
+            if (e.key === 'Enter')  { e.preventDefault(); sendGameChat();  return; }
+            return; // swallow all other keys so movement doesn't fire while typing
+        }
+    }
+    const k = e.key.toLowerCase();
+    if (k in keys) keys[k] = true;
+});
+window.addEventListener('keyup', e => {
+    if (gameChatOpen) return;  // don't release movement keys while chat is open
+    const k = e.key.toLowerCase();
+    if (k in keys) keys[k] = false;
+});
+window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; updateWorldMouse(); });
+// Prevent ALL native browser drag-and-drop on every element — stops the "PNG drag" glitch
+document.addEventListener('dragstart', e => e.preventDefault());
+// Build placement — on the canvas directly so e.target is always unambiguous
+canvas.addEventListener('mousedown', e => {
+    if (e.button === 0 && (currentPhase === 1 || currentPhase === 2) && ws && ws.readyState === WebSocket.OPEN) {
+        if (currentBuild) {
+            // Place building
+            const bx = snapToGrid(mouse.wx);
+            const by = snapToGrid(mouse.wy);
+            if (canPlaceBuilding(currentBuild, bx, by)) {
+                ws.send(JSON.stringify({ t: 'b', bt: currentBuild, x: bx, y: by }));
+            }
+            e.stopPropagation();
+        } else {
+            // Check if clicking on a friendly turret or wall for upgrade
+            let hitTurret = null;
+            let hitWall   = null;
+            const wHit = WALL_HALF + 4; // click padding for walls (matches collision box)
+            for (const b of localBuildings.values()) {
+                if (b.tm !== myState.team) continue;
+                if (b.tp === 't' && Math.hypot(mouse.wx - b.x, mouse.wy - b.y) < (b.r || 20) + 10) {
+                    hitTurret = b; break;
+                }
+                if (b.tp === 'w' && Math.abs(mouse.wx - b.x) < wHit && Math.abs(mouse.wy - b.y) < wHit) {
+                    hitWall = b;
+                }
+            }
+            if (hitTurret) {
+                selectedTurret = hitTurret.i;
+                selectedWall   = null; hideWallUpgradePanel();
+                updateUpgradePanel();
+                e.stopPropagation();
+            } else if (hitWall) {
+                selectedWall   = hitWall.i;
+                selectedTurret = null; hideUpgradePanel();
+                updateWallUpgradePanel();
+                e.stopPropagation();
+            } else {
+                selectedTurret = null; hideUpgradePanel();
+                selectedWall   = null; hideWallUpgradePanel();
+            }
+        }
+    }
+});
+
+// Shooting + cancel — window level handles everything else
+window.addEventListener('mousedown', e => {
+    if (e.button === 0) {
+        if (!currentBuild) mouse.down = true;
+    } else if (e.button === 2) {
+        selectBuild(null);
+    }
+});
+window.addEventListener('mouseup', e => { if (e.button === 0) mouse.down = false; });
+window.addEventListener('contextmenu', e => e.preventDefault());
+
+function updateWorldMouse() {
+    // Convert screen mouse position to world coordinates, accounting for
+    // camera rotation (so enemy is always at the top of the screen).
+    const sx  = mouse.x - canvas.width  / 2;
+    const sy  = mouse.y - canvas.height / 2;
+    const rot = getCamRotation();
+    const c   = Math.cos(rot), s = Math.sin(rot);
+    // Undo zoom and rotation to get world coords
+    mouse.wx = cam.x + (sx * c + sy * s) / CAM_ZOOM;
+    mouse.wy = cam.y + (-sx * s + sy * c) / CAM_ZOOM;
+}
+
+// ─── Render loop ──────────────────────────────────────────────────────────────
+let lastFrame = performance.now();
+
+let scrapAccum = 0;
+let serverRes  = 0;        // last authoritative value from server
+const SCRAP_RATE = 4; // scrap per second during attack phase
+
+function renderLoop() {
+    const now = performance.now();
+    const dt  = Math.min((now - lastFrame) / 1000, 0.05);
+    lastFrame  = now;
+
+    const inGame = !$hudTop.classList.contains('hidden');
+
+    if (inGame) {
+        predictMovement(dt);
+
+        cam.x += (myState.x - cam.x) * 0.12;
+        cam.y += (myState.y - cam.y) * 0.12;
+        updateWorldMouse();
+
+        myState.a = Math.atan2(mouse.wy - myState.y, mouse.wx - myState.x);
+
+        // Passive scrap income during attack phase
+        if (currentPhase === 2 && myId) {
+            scrapAccum += SCRAP_RATE * dt;
+            if (scrapAccum >= 1) {
+                const gain = Math.floor(scrapAccum);
+                serverRes  += gain;
+                scrapAccum -= gain;
+                myState.res = serverRes;
+            }
+        }
+    }
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (inGame || !$lobbyScreen.classList.contains('hidden')) {
+        ctx.save();
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate(getCamRotation());
+        ctx.scale(CAM_ZOOM, CAM_ZOOM);
+        ctx.translate(-cam.x, -cam.y);
+        drawWorld();
+        ctx.restore();
+    }
+
+    requestAnimationFrame(renderLoop);
+}
+
+// ─── Movement prediction ──────────────────────────────────────────────────────
+function predictMovement(dt) {
+    if (myState.rt > 0) { myState.rt = Math.max(0, myState.rt - dt); return; }
+
+    const { dx, dy } = getWorldMovement();
+
+    const mid  = mapData.mw / 2;
+    let minX   = myState.r;
+    let maxX   = mapData.mw - myState.r;
+    if (currentPhase === 1) {
+        if (myState.team === 0) maxX = mid - myState.r;
+        else                    minX = mid + myState.r;
+    }
+
+    let nx = myState.x + dx * 250 * dt;
+    let ny = myState.y + dy * 250 * dt;
+
+    for (const b of localBuildings.values()) {
+        if (b.tp === 'w') {
+            if (circleRect(nx, myState.y, myState.r, b.x - WALL_HALF, b.y - WALL_HALF, WALL_W, WALL_W)) nx = myState.x;
+            if (circleRect(myState.x, ny, myState.r, b.x - WALL_HALF, b.y - WALL_HALF, WALL_W, WALL_W)) ny = myState.y;
+        } else if (b.tp === 't') {
+            // Turret — circle-circle push back
+            const tr = (b.r || TURRET_COLL_R) + myState.r;
+            if (Math.hypot(nx - b.x, myState.y - b.y) < tr) nx = myState.x;
+            if (Math.hypot(myState.x - b.x, ny       - b.y) < tr) ny = myState.y;
+        }
+    }
+
+    // Water zone collision — push back if entering water
+    if (isOnWater(nx, myState.y, myState.r)) nx = myState.x;
+    if (isOnWater(myState.x, ny, myState.r)) ny = myState.y;
+
+    myState.x = Math.max(minX, Math.min(maxX, nx));
+    myState.y = Math.max(myState.r, Math.min(mapData.mh - myState.r, ny));
+}
+
+// ─── UI updates ───────────────────────────────────────────────────────────────
+function updateUI() {
+    const phases = ['LOBBY', 'BUILD PHASE', 'ATTACK PHASE', 'GAME OVER'];
+    document.getElementById('phaseDisplay').innerText = phases[currentPhase] || '…';
+
+    if (currentPhase === 1) {
+        const elapsed = (performance.now() - timerReceivedAt) / 1000;
+        const display = Math.max(0, timerBaseValue - elapsed);
+        const m = Math.floor(display / 60);
+        const s = Math.floor(display % 60);
+        document.getElementById('timerDisplay').innerText = `${m}:${String(s).padStart(2,'0')}`;
+    } else {
+        document.getElementById('timerDisplay').innerText = currentPhase === 2 ? '∞' : '--';
+    }
+
+    // Faction banner under timer — show resolved factions once game starts
+    const bannerEl = document.getElementById('factionBanner');
+    if (bannerEl && myId && (currentPhase === 1 || currentPhase === 2)) {
+        const mf = FACTIONS[teamFactions[myState.team]] || FACTIONS['roe'];
+        const ef = FACTIONS[teamFactions[1 - myState.team]] || FACTIONS['roe'];
+        bannerEl.style.display = 'block';
+        bannerEl.innerHTML =
+            `<span style="color:${mf.color};">${mf.short}</span>` +
+            `<span style="color:rgba(255,255,255,0.2);"> vs </span>` +
+            `<span style="color:${ef.color};">${ef.short}</span>`;
+    } else if (bannerEl) {
+        bannerEl.style.display = 'none';
+    }
+
+    // Map name badge
+    const mapNameEl = document.getElementById('mapNameDisplay');
+    if (mapNameEl && mapName) {
+        mapNameEl.style.display = 'block';
+        mapNameEl.textContent = '🗺 ' + mapName;
+    }
+
+    if (coreData.length >= 2) {
+        document.getElementById('redBar').style.width  = `${Math.max(0, (coreHPs[0] / coreData[0].mhp) * 100)}%`;
+        document.getElementById('blueBar').style.width = `${Math.max(0, (coreHPs[1] / coreData[1].mhp) * 100)}%`;
+    }
+
+    if (myId) {
+        const hpPct = Math.max(0, (myState.hp / myState.maxHp) * 100);
+        const hpBar = document.getElementById('hpBar');
+        hpBar.style.width      = `${hpPct}%`;
+        hpBar.style.background = hpPct > 50 ? '#22c55e' : hpPct > 20 ? '#f59e0b' : '#dc2626';
+        document.getElementById('scrapVal').innerText = myState.res;
+
+        if (currentPhase === 1 || currentPhase === 2) {
+            $buildMenu.classList.remove('hidden');
+        } else {
+            $buildMenu.classList.add('hidden');
+            if (currentBuild) selectBuild(null);
+        }
+
+        // Refresh upgrade panel affordability whenever scrap updates
+        if (selectedTurret) updateUpgradePanel();
+        if (selectedWall)   updateWallUpgradePanel();
+
+        if (myState.rt > 0) {
+            $respawn.classList.remove('hidden');
+            $respawnSec.innerText = Math.ceil(myState.rt);
+        } else {
+            $respawn.classList.add('hidden');
+        }
+    }
+}
+
+function showGameOver(winner) {
+    $gameOver.classList.remove('hidden');
+    const el  = document.getElementById('winnerText');
+    el.innerText = winner === 0 ? 'RED WINS!' : 'BLUE WINS!';
+    $gameOver.style.background = winner === 0
+        ? 'linear-gradient(145deg, #7f1d1d, #b91c1c)'
+        : 'linear-gradient(145deg, #1e3a8a, #1d4ed8)';
+}
+
+// ─── Geometry helpers ─────────────────────────────────────────────────────────
+function circleRect(cx, cy, cr, rx, ry, rw, rh) {
+    const tx = Math.max(rx, Math.min(cx, rx+rw));
+    const ty = Math.max(ry, Math.min(cy, ry+rh));
+    return (cx-tx)**2 + (cy-ty)**2 <= cr*cr;
+}
+
+// Returns true if position (x,y) with margin r overlaps any water zone
+function isOnWater(x, y, r = 0) {
+    for (const wz of mapWaterZones) {
+        if (x + r > wz.x && x - r < wz.x + wz.w &&
+            y + r > wz.y && y - r < wz.y + wz.h) return true;
+    }
+    return false;
+}
+
+// Returns true if placing building type bt at (gx,gy) would overlap an existing building.
+const TURRET_PLACE_R = 24; // visual outer radius used for placement collision
+function canPlaceBuilding(bt, gx, gy) {
+    for (const b of localBuildings.values()) {
+        if (bt === 'w') {
+            // Placing a wall (50×50 collision box)
+            if (b.tp === 'w') {
+                // Wall vs wall — AABB overlap using real collision size
+                if (Math.abs(gx - b.x) < WALL_W && Math.abs(gy - b.y) < WALL_W) return false;
+            } else {
+                // Wall vs turret — circle vs rect using real wall size
+                if (circleRect(b.x, b.y, TURRET_PLACE_R, gx - WALL_HALF, gy - WALL_HALF, WALL_W, WALL_W)) return false;
+            }
+        } else {
+            // Placing a turret (circle)
+            if (b.tp === 'w') {
+                // Turret vs wall — circle vs rect using real wall size
+                if (circleRect(gx, gy, TURRET_PLACE_R, b.x - WALL_HALF, b.y - WALL_HALF, WALL_W, WALL_W)) return false;
+            } else {
+                // Turret vs turret — circle vs circle
+                if (Math.hypot(gx - b.x, gy - b.y) < TURRET_PLACE_R * 2) return false;
+            }
+        }
+    }
+    return true;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  DRAWING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function drawWorld() {
+    const mw = mapData.mw, mh = mapData.mh;
+
+    // ── Base land fill ────────────────────────────────────────────────────────
+    ctx.fillStyle = '#0d1117';
+    ctx.fillRect(0, 0, mw, mh);
+
+    // ── Water zones ───────────────────────────────────────────────────────────
+    for (const wz of mapWaterZones) {
+        // Deep water fill
+        const waterGrad = ctx.createLinearGradient(wz.x, wz.y, wz.x, wz.y + wz.h);
+        waterGrad.addColorStop(0,   'rgba(10, 30, 80, 0.95)');
+        waterGrad.addColorStop(0.5, 'rgba(6,  20, 60, 0.98)');
+        waterGrad.addColorStop(1,   'rgba(10, 30, 80, 0.95)');
+        ctx.fillStyle = waterGrad;
+        ctx.fillRect(wz.x, wz.y, wz.w, wz.h);
+
+        // Animated wave shimmer
+        const now2 = performance.now();
+        ctx.save();
+        ctx.globalAlpha = 0.06;
+        ctx.strokeStyle = '#60a5fa';
+        ctx.lineWidth = 1;
+        const waveAmp = 4;
+        const waveFreq = 0.015;
+        const waveSpeed = now2 / 1200;
+        const waveRows = Math.floor(wz.h / 28);
+        for (let row = 0; row <= waveRows; row++) {
+            const wy = wz.y + row * 28;
+            ctx.beginPath();
+            for (let wx = wz.x; wx <= wz.x + wz.w; wx += 4) {
+                const wvy = wy + Math.sin((wx * waveFreq) + waveSpeed + row * 0.7) * waveAmp;
+                row === 0 && wx === wz.x ? ctx.moveTo(wx, wvy) : ctx.lineTo(wx, wvy);
+            }
+            ctx.stroke();
+        }
+        ctx.restore();
+
+        // Water edge foam/border
+        ctx.save();
+        ctx.strokeStyle = 'rgba(147, 197, 253, 0.25)';
+        ctx.lineWidth = 3;
+        ctx.shadowColor = '#93c5fd';
+        ctx.shadowBlur = 8;
+        ctx.strokeRect(wz.x, wz.y, wz.w, wz.h);
+        ctx.shadowBlur = 0;
+        ctx.restore();
+
+        // "WATER" impassable label in large zones
+        if (wz.w > 200 && wz.h > 100) {
+            ctx.save();
+            ctx.globalAlpha = 0.08;
+            ctx.font = 'bold 48px "Bebas Neue", sans-serif';
+            ctx.fillStyle = '#60a5fa';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('⚓ WATER', wz.x + wz.w / 2, wz.y + wz.h / 2);
+            ctx.restore();
+        }
+    }
+
+    // ── Team colour gradients over land ──────────────────────────────────────
+    const rg = ctx.createLinearGradient(0, 0, mw * 0.55, 0);
+    rg.addColorStop(0, 'rgba(127,29,29,0.28)');
+    rg.addColorStop(1, 'rgba(127,29,29,0)');
+    ctx.fillStyle = rg;
+    // Clip to non-water when drawing gradient (approximate — fine for visual)
+    ctx.fillRect(0, 0, mw / 2, mh);
+
+    const bg = ctx.createLinearGradient(mw, 0, mw * 0.45, 0);
+    bg.addColorStop(0, 'rgba(29,78,216,0.28)');
+    bg.addColorStop(1, 'rgba(29,78,216,0)');
+    ctx.fillStyle = bg;
+    ctx.fillRect(mw / 2, 0, mw, mh);
+
+    // ── Grid ──────────────────────────────────────────────────────────────────
+    ctx.strokeStyle = 'rgba(255,255,255,0.028)';
+    ctx.lineWidth = 1;
+    const gs = 64;
+    for (let x = 0; x <= mw; x += gs) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,mh); ctx.stroke(); }
+    for (let y = 0; y <= mh; y += gs) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(mw,y); ctx.stroke(); }
+
+    // ── Map border ────────────────────────────────────────────────────────────
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = 5;
+    ctx.strokeRect(2, 2, mw-4, mh-4);
+
+    // ── Centre divider ────────────────────────────────────────────────────────
+    if (currentPhase === 1) {
+        ctx.save();
+        ctx.setLineDash([18, 10]);
+        ctx.beginPath(); ctx.moveTo(mw/2, 0); ctx.lineTo(mw/2, mh);
+        ctx.strokeStyle = 'rgba(251,191,36,0.45)';
+        ctx.lineWidth = 6;
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+    } else {
+        ctx.beginPath(); ctx.moveTo(mw/2, 0); ctx.lineTo(mw/2, mh);
+        ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+
+    // ── Build zone highlight ──────────────────────────────────────────────────
+    if ((currentPhase === 1 || currentPhase === 2) && currentBuild) {
+        ctx.fillStyle = myState.team === 0
+            ? 'rgba(220,38,38,0.06)' : 'rgba(37,99,235,0.06)';
+        if (myState.team === 0) ctx.fillRect(0, 0, mw/2 - 50, mh);
+        else                    ctx.fillRect(mw/2 + 50, 0, mw/2, mh);
+    }
+
+    // ── Map name watermark ────────────────────────────────────────────────────
+    if (mapName) {
+        ctx.save();
+        ctx.globalAlpha = 0.06;
+        ctx.font = 'bold 120px "Bebas Neue", sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(mapName, mw / 2, mh / 2);
+        ctx.restore();
+    }
+
+    drawBuildings();
+    drawCores();
+    drawProjectiles();
+    drawPlayers();
+    drawBuildGhost();
+}
+
+// ── Buildings ──────────────────────────────────────────────────────────────────
+function drawBuildings() {
+    const camRot = getCamRotation();
+    const hw     = GRID_SIZE / 2;
+
+    // Build enemy list for turret aim tracking
+    const enemies = [];
+    if (myId && myState.rt <= 0) {
+        // remote players on opposite team are enemies
+    }
+    for (const p of getInterpolatedPlayers()) {
+        enemies.push({ x: p.x, y: p.y, team: p.tm });
+    }
+    if (myId && myState.rt <= 0) {
+        enemies.push({ x: myState.x, y: myState.y, team: myState.team });
+    }
+
+    for (const b of localBuildings.values()) {
+        ctx.save();
+        ctx.translate(b.x, b.y);
+
+        const isRed    = b.tm === 0;
+        const bFaction = teamFactions[b.tm] || 'roe';
+        // Faction-specific accent colours — ROE keeps team colours, BGM = orange, EPA = cyan
+        const col   = bFaction === 'bgm' ? '#f97316' : bFaction === 'epa' ? '#22d3ee' : (isRed ? '#dc2626' : '#2563eb');
+        const dark  = bFaction === 'bgm' ? '#7c2d12' : bFaction === 'epa' ? '#164e63' : (isRed ? '#7f1d1d' : '#1e3a8a');
+        const light = bFaction === 'bgm' ? '#fed7aa' : bFaction === 'epa' ? '#a5f3fc' : (isRed ? '#fca5a5' : '#93c5fd');
+        const mid   = bFaction === 'bgm' ? '#9a3412' : bFaction === 'epa' ? '#0e7490'  : (isRed ? '#b91c1c' : '#1e40af');
+
+        if (b.tp === 'w') {
+            // ── WALL — faction-specific 16×16 top-down block ──────────────────
+            const S = GRID_SIZE;
+            const isReinforced = (b.st === 'w_reinforced');
+
+            // Selection glow
+            if (b.i === selectedWall) {
+                ctx.strokeStyle = '#86efac';
+                ctx.lineWidth   = 2;
+                ctx.shadowColor = '#86efac';
+                ctx.shadowBlur  = 14;
+                ctx.setLineDash([5, 3]);
+                ctx.strokeRect(-hw - 4, -hw - 4, S + 8, S + 8);
+                ctx.setLineDash([]);
+                ctx.shadowBlur = 0;
+            }
+
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fillRect(-hw + 2, -hw + 2, S, S);
+
+            if (bFaction === 'bgm') {
+                // ── BGM walls — subtype-specific industrial visuals ──────────────
+                const now2 = performance.now();
+
+                // Selection glow colour depends on subtype
+                const wallSelCol = {
+                    'bgm_w_blast':   '#f97316', 'bgm_w_thermal': '#ef4444',
+                    'bgm_w_anchor':  '#fbbf24',  'bgm_w_conduit': '#86efac',
+                }[b.st] || col;
+
+                if (b.st === 'bgm_w_blast') {
+                    // ── Blast Wall: angular reinforced chevron plates, orange glow ──
+                    ctx.fillStyle = '#1e0e04';
+                    ctx.fillRect(-hw, -hw, S, S);
+                    // Angled armour chevrons
+                    ctx.fillStyle = '#3a1c08';
+                    ctx.beginPath();
+                    ctx.moveTo(-hw, -hw); ctx.lineTo(hw, -hw);
+                    ctx.lineTo(0, 0); ctx.closePath(); ctx.fill();
+                    ctx.fillStyle = '#2a1204';
+                    ctx.beginPath();
+                    ctx.moveTo(-hw, hw); ctx.lineTo(hw, hw);
+                    ctx.lineTo(0, 0); ctx.closePath(); ctx.fill();
+                    // Shock absorber bolts — 4 large orange dots
+                    ctx.fillStyle = '#f97316';
+                    ctx.globalAlpha = 0.9;
+                    for (const [bx, by] of [[-hw+4, 0],[hw-4, 0],[0, -hw+4],[0, hw-4]]) {
+                        ctx.beginPath(); ctx.arc(bx, by, 2.5, 0, Math.PI * 2); ctx.fill();
+                    }
+                    ctx.globalAlpha = 1;
+                    // Outer frame glow
+                    ctx.strokeStyle = '#f97316';
+                    ctx.lineWidth = 1.5;
+                    ctx.shadowColor = '#f97316'; ctx.shadowBlur = 8;
+                    ctx.strokeRect(-hw, -hw, S, S);
+                    ctx.shadowBlur = 0;
+
+                } else if (b.st === 'bgm_w_thermal') {
+                    // ── Thermal Wall: heat-radiating glowing orange core plates ────
+                    const pulse = Math.sin(now2 / 500) * 0.4 + 0.6;
+                    ctx.fillStyle = '#200a00';
+                    ctx.fillRect(-hw, -hw, S, S);
+                    // Heat gradient fill
+                    const heatGrd = ctx.createRadialGradient(0, 0, 0, 0, 0, hw * 1.4);
+                    heatGrd.addColorStop(0, `rgba(239,68,68,${0.35 * pulse})`);
+                    heatGrd.addColorStop(1, 'rgba(239,68,68,0)');
+                    ctx.fillStyle = heatGrd;
+                    ctx.fillRect(-hw, -hw, S, S);
+                    // Horizontal heat vents
+                    for (let row = 0; row < 3; row++) {
+                        const ry = -hw + 3 + row * (S / 3);
+                        ctx.fillStyle = `rgba(239,68,68,${0.4 * pulse})`;
+                        ctx.fillRect(-hw + 2, ry, S - 4, 2);
+                    }
+                    // Corner emitter nodes
+                    ctx.fillStyle = '#ef4444';
+                    ctx.globalAlpha = 0.85 * pulse;
+                    for (const [bx, by] of [[-hw+2,-hw+2],[hw-2,-hw+2],[-hw+2,hw-2],[hw-2,hw-2]]) {
+                        ctx.beginPath(); ctx.arc(bx, by, 2, 0, Math.PI * 2); ctx.fill();
+                    }
+                    ctx.globalAlpha = 1;
+                    ctx.strokeStyle = `rgba(239,68,68,${0.6 * pulse})`;
+                    ctx.lineWidth = 1.5;
+                    ctx.shadowColor = '#ef4444'; ctx.shadowBlur = 8 * pulse;
+                    ctx.strokeRect(-hw, -hw, S, S);
+                    ctx.shadowBlur = 0;
+
+                } else if (b.st === 'bgm_w_anchor') {
+                    // ── Anchor Wall: massive double-thick bunker plating, gold trim ─
+                    // Dark heavy base
+                    ctx.fillStyle = '#0d0804';
+                    ctx.fillRect(-hw, -hw, S, S);
+                    // Thick inner steel plate
+                    ctx.fillStyle = '#1e1409';
+                    ctx.fillRect(-hw + 2, -hw + 2, S - 4, S - 4);
+                    // Cross brace
+                    ctx.fillStyle = '#150f06';
+                    ctx.fillRect(-hw, -1, S, 2);
+                    ctx.fillRect(-1, -hw, 2, S);
+                    // Large anchor bolts — golden
+                    ctx.fillStyle = '#fbbf24';
+                    ctx.globalAlpha = 0.95;
+                    for (const [bx, by] of [[-hw+3,-hw+3],[hw-3,-hw+3],[-hw+3,hw-3],[hw-3,hw-3]]) {
+                        ctx.beginPath(); ctx.arc(bx, by, 3, 0, Math.PI * 2); ctx.fill();
+                    }
+                    ctx.globalAlpha = 1;
+                    // Double border — thick outer, thin inner
+                    ctx.strokeStyle = '#fbbf24';
+                    ctx.lineWidth = 2;
+                    ctx.shadowColor = '#fbbf24'; ctx.shadowBlur = 6;
+                    ctx.strokeRect(-hw, -hw, S, S);
+                    ctx.shadowBlur = 0;
+                    ctx.strokeStyle = 'rgba(251,191,36,0.3)';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(-hw + 3, -hw + 3, S - 6, S - 6);
+
+                } else if (b.st === 'bgm_w_conduit') {
+                    // ── Conduit Wall: energy lattice, green pulse radiating outward ─
+                    const pulse = Math.sin(now2 / 700) * 0.5 + 0.5;
+                    ctx.fillStyle = '#030f0a';
+                    ctx.fillRect(-hw, -hw, S, S);
+                    // Energy lattice lines
+                    ctx.strokeStyle = `rgba(134,239,172,${0.15 + pulse * 0.15})`;
+                    ctx.lineWidth = 0.8;
+                    // Horizontal grid
+                    for (let i = 1; i < 4; i++) {
+                        const y2 = -hw + i * (S / 4);
+                        ctx.beginPath(); ctx.moveTo(-hw, y2); ctx.lineTo(hw, y2); ctx.stroke();
+                    }
+                    // Diagonal cross
+                    ctx.beginPath(); ctx.moveTo(-hw, -hw); ctx.lineTo(hw, hw); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(hw, -hw); ctx.lineTo(-hw, hw); ctx.stroke();
+                    // Central conduit node — pulsing green orb
+                    ctx.beginPath(); ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(134,239,172,${0.7 + pulse * 0.3})`; ctx.fill();
+                    ctx.shadowColor = '#86efac'; ctx.shadowBlur = 10 * pulse;
+                    ctx.strokeStyle = '#86efac'; ctx.lineWidth = 1.5;
+                    ctx.stroke(); ctx.shadowBlur = 0;
+                    // Corner connectors
+                    ctx.fillStyle = '#86efac';
+                    ctx.globalAlpha = 0.6 + pulse * 0.3;
+                    for (const [bx, by] of [[-hw+2,-hw+2],[hw-2,-hw+2],[-hw+2,hw-2],[hw-2,hw-2]]) {
+                        ctx.fillRect(bx - 1, by - 1, 2, 2);
+                    }
+                    ctx.globalAlpha = 1;
+                    // Outer border
+                    ctx.strokeStyle = `rgba(134,239,172,${0.35 + pulse * 0.35})`;
+                    ctx.lineWidth = 1;
+                    ctx.shadowColor = '#86efac'; ctx.shadowBlur = 4 * pulse;
+                    ctx.strokeRect(-hw, -hw, S, S);
+                    ctx.shadowBlur = 0;
+
+                    // Conduit range ring (drawn in world space, outside wall tile)
+                    const conduitRingR = 200;
+                    ctx.setLineDash([6, 10]);
+                    ctx.strokeStyle = `rgba(134,239,172,${0.06 + pulse * 0.06})`;
+                    ctx.lineWidth = 1;
+                    ctx.beginPath(); ctx.arc(0, 0, conduitRingR, 0, Math.PI * 2); ctx.stroke();
+                    ctx.setLineDash([]);
+
+                } else {
+                    // ── BGM base wall (Excavation Barrier): corrugated iron ─────────
+                    ctx.fillStyle = '#2b2217';
+                    ctx.fillRect(-hw, -hw, S, S);
+                    for (let row = 0; row < 4; row++) {
+                        const ry = -hw + row * (S / 4);
+                        ctx.fillStyle = row % 2 === 0 ? '#3a2e1e' : '#241a0f';
+                        ctx.fillRect(-hw, ry, S, S / 4);
+                    }
+                    ctx.fillStyle = '#1a1008';
+                    ctx.fillRect(-1, -hw, 2, S);
+                    ctx.fillStyle = '#f97316';
+                    ctx.globalAlpha = 0.85;
+                    for (const [bx, by] of [[-hw+2,-hw+2],[hw-2,-hw+2],[-hw+2,hw-2],[hw-2,hw-2]]) {
+                        ctx.beginPath(); ctx.arc(bx, by, 1.5, 0, Math.PI * 2); ctx.fill();
+                    }
+                    ctx.globalAlpha = 1;
+                    ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.globalAlpha = 0.6;
+                    ctx.strokeRect(-hw, -hw, S, S); ctx.globalAlpha = 1;
+                }
+
+            } else if (bFaction === 'epa') {
+                // ── EPA walls — subtype-specific precision panel visuals ──────────
+                const now2  = performance.now();
+                const pulse = Math.sin(now2 / 800) * 0.5 + 0.5;
+
+                // Shared base: sleek dark panel with diagonal shear lines
+                ctx.fillStyle = '#0c1e26';
+                ctx.fillRect(-hw, -hw, S, S);
+                ctx.strokeStyle = 'rgba(34,211,238,0.10)';
+                ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(-hw, -hw + S * 0.35); ctx.lineTo(-hw + S * 0.35, -hw); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(-hw, hw); ctx.lineTo(hw, -hw); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(-hw + S * 0.65, hw); ctx.lineTo(hw, -hw + S * 0.35); ctx.stroke();
+
+                if (b.st === 'epa_w') {
+                    // ── Defense Panel: plain cyan trim, corner lights ─────────────
+                    ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.globalAlpha = 0.45;
+                    ctx.strokeRect(-hw, -hw, S, S); ctx.globalAlpha = 1;
+                    ctx.fillStyle = col; ctx.globalAlpha = 0.7;
+                    for (const [bx, by] of [[-hw+2,-hw+2],[hw-2,-hw+2],[-hw+2,hw-2],[hw-2,hw-2]])
+                        ctx.fillRect(bx-1, by-1, 2, 2);
+                    ctx.globalAlpha = 1;
+
+                } else if (b.st === 'epa_w_fort') {
+                    // ── Fortified Defense Panel: double-plate look, brighter trim ──
+                    ctx.fillStyle = '#112233';
+                    ctx.fillRect(-hw+2, -hw+2, S-4, S-4);
+                    // Horizontal plate seam
+                    ctx.strokeStyle = 'rgba(34,211,238,0.2)'; ctx.lineWidth = 1;
+                    ctx.beginPath(); ctx.moveTo(-hw+2, 0); ctx.lineTo(hw-2, 0); ctx.stroke();
+                    ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.6;
+                    ctx.strokeRect(-hw, -hw, S, S); ctx.globalAlpha = 1;
+                    ctx.strokeStyle = col + '44'; ctx.lineWidth = 0.8;
+                    ctx.strokeRect(-hw+3, -hw+3, S-6, S-6);
+                    ctx.fillStyle = col; ctx.globalAlpha = 0.85;
+                    for (const [bx, by] of [[-hw+2,-hw+2],[hw-2,-hw+2],[-hw+2,hw-2],[hw-2,hw-2]])
+                        ctx.fillRect(bx-1, by-1, 2, 2);
+                    ctx.globalAlpha = 1;
+
+                } else if (b.st === 'epa_w_bulwark') {
+                    // ── Bulwark: regen glow — subtle green tinge pulsing inside ────
+                    ctx.fillStyle = '#0a1e1a';
+                    ctx.fillRect(-hw+2, -hw+2, S-4, S-4);
+                    // Regen inner glow
+                    const regenGrd = ctx.createRadialGradient(0, 0, 0, 0, 0, hw * 1.2);
+                    regenGrd.addColorStop(0, `rgba(52,211,153,${0.12 * pulse})`);
+                    regenGrd.addColorStop(1, 'rgba(52,211,153,0)');
+                    ctx.fillStyle = regenGrd; ctx.fillRect(-hw, -hw, S, S);
+                    // Horizontal repair-grid lines
+                    ctx.strokeStyle = `rgba(52,211,153,${0.15 + pulse * 0.1})`; ctx.lineWidth = 0.8;
+                    for (let row = 1; row < 4; row++) {
+                        const ry = -hw + row * (S / 4);
+                        ctx.beginPath(); ctx.moveTo(-hw+2, ry); ctx.lineTo(hw-2, ry); ctx.stroke();
+                    }
+                    ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.55;
+                    ctx.strokeRect(-hw, -hw, S, S); ctx.globalAlpha = 1;
+                    ctx.fillStyle = '#34d399'; ctx.globalAlpha = 0.7 + pulse * 0.2;
+                    for (const [bx, by] of [[-hw+2,-hw+2],[hw-2,-hw+2],[-hw+2,hw-2],[hw-2,hw-2]])
+                        ctx.fillRect(bx-1, by-1, 2, 2);
+                    ctx.globalAlpha = 1;
+
+                } else if (b.st === 'epa_w_guardian') {
+                    // ── Guardian: purple intercept tint, arc notches on corners ─────
+                    ctx.fillStyle = '#120e20';
+                    ctx.fillRect(-hw+2, -hw+2, S-4, S-4);
+                    // Intercept arc marks on each edge midpoint
+                    ctx.strokeStyle = `rgba(167,139,250,${0.35 + pulse * 0.2})`; ctx.lineWidth = 1.5;
+                    const mid2 = hw - 4;
+                    for (const [ax, ay, sa, ea] of [
+                        [0,-mid2, -0.5, Math.PI+0.5], [0,mid2, 0.5, Math.PI+0.5+Math.PI],
+                        [-mid2,0, Math.PI-0.5, Math.PI*2+0.5], [mid2,0, -0.5-Math.PI, 0.5],
+                    ]) {
+                        ctx.beginPath(); ctx.arc(ax, ay, 4, sa, ea); ctx.stroke();
+                    }
+                    ctx.strokeStyle = '#a78bfa'; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.65;
+                    ctx.strokeRect(-hw, -hw, S, S); ctx.globalAlpha = 1;
+                    ctx.strokeStyle = '#a78bfa44'; ctx.lineWidth = 0.8;
+                    ctx.strokeRect(-hw+3, -hw+3, S-6, S-6);
+                    ctx.fillStyle = '#a78bfa'; ctx.globalAlpha = 0.85;
+                    for (const [bx, by] of [[-hw+2,-hw+2],[hw-2,-hw+2],[-hw+2,hw-2],[hw-2,hw-2]])
+                        ctx.fillRect(bx-1, by-1, 2, 2);
+                    ctx.globalAlpha = 1;
+
+                } else if (b.st === 'epa_w_citadel') {
+                    // ── Citadel Segment: shield aura ring + indigo/cyan plate ────────
+                    ctx.fillStyle = '#0d0d22';
+                    ctx.fillRect(-hw+2, -hw+2, S-4, S-4);
+                    // Aura range ring (drawn in world space)
+                    ctx.beginPath(); ctx.arc(0, 0, 180, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(129,140,248,${0.05 + pulse * 0.05})`;
+                    ctx.lineWidth = 1.5; ctx.setLineDash([5, 10]); ctx.stroke(); ctx.setLineDash([]);
+                    // Centre shield emblem — small diamond
+                    ctx.save();
+                    ctx.rotate(Math.PI / 4);
+                    ctx.fillStyle = `rgba(129,140,248,${0.4 + pulse * 0.2})`;
+                    ctx.fillRect(-3, -3, 6, 6);
+                    ctx.restore();
+                    ctx.strokeStyle = '#818cf8'; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.7;
+                    ctx.strokeRect(-hw, -hw, S, S);
+                    ctx.shadowColor = '#818cf8'; ctx.shadowBlur = 6 * pulse; ctx.stroke();
+                    ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+                    ctx.fillStyle = '#818cf8'; ctx.globalAlpha = 0.9;
+                    for (const [bx, by] of [[-hw+2,-hw+2],[hw-2,-hw+2],[-hw+2,hw-2],[hw-2,hw-2]])
+                        ctx.fillRect(bx-1, by-1, 2, 2);
+                    ctx.globalAlpha = 1;
+
+                } else if (b.st === 'epa_w_bastion') {
+                    // ── Bastion Segment: gold energy reinforcement, damage-share ring ─
+                    ctx.fillStyle = '#100e00';
+                    ctx.fillRect(-hw, -hw, S, S);
+                    // Energy layering — gold inner plate
+                    ctx.fillStyle = '#1a1500';
+                    ctx.fillRect(-hw+2, -hw+2, S-4, S-4);
+                    // Bastion damage-share ring
+                    ctx.beginPath(); ctx.arc(0, 0, 200, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(245,158,11,${0.06 + pulse * 0.08})`;
+                    ctx.lineWidth = 2; ctx.setLineDash([4, 8]); ctx.stroke(); ctx.setLineDash([]);
+                    // Inner radial energy lines
+                    ctx.strokeStyle = `rgba(245,158,11,${0.2 + pulse * 0.15})`; ctx.lineWidth = 0.8;
+                    for (let i = 0; i < 4; i++) {
+                        const a = (i / 4) * Math.PI * 2;
+                        ctx.beginPath();
+                        ctx.moveTo(Math.cos(a) * 3, Math.sin(a) * 3);
+                        ctx.lineTo(Math.cos(a) * (hw - 2), Math.sin(a) * (hw - 2));
+                        ctx.stroke();
+                    }
+                    // Double gold border
+                    ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2;
+                    ctx.shadowColor = '#f59e0b'; ctx.shadowBlur = 8 * pulse;
+                    ctx.strokeRect(-hw, -hw, S, S); ctx.shadowBlur = 0;
+                    ctx.strokeStyle = 'rgba(245,158,11,0.3)'; ctx.lineWidth = 1;
+                    ctx.strokeRect(-hw+3, -hw+3, S-6, S-6);
+                    // Corner energy bolts — large gold
+                    ctx.fillStyle = '#f59e0b'; ctx.globalAlpha = 0.95;
+                    for (const [bx, by] of [[-hw+2,-hw+2],[hw-2,-hw+2],[-hw+2,hw-2],[hw-2,hw-2]]) {
+                        ctx.beginPath(); ctx.arc(bx, by, 2.5, 0, Math.PI * 2); ctx.fill();
+                    }
+                    ctx.globalAlpha = 1;
+                }
+
+            } else {
+                // ROE — original stone/brick wall (jack of all trades, sturdy look)
+                ctx.fillStyle = isReinforced ? '#2e3d44' : '#2a3344';
+                ctx.fillRect(-hw, -hw, S, S);
+
+                if (isReinforced) {
+                    ctx.fillStyle = 'rgba(134,239,172,0.08)';
+                    ctx.fillRect(-hw, -hw, S, 3);
+                    ctx.fillRect(-hw, hw - 3, S, 3);
+                    ctx.fillRect(-hw, -hw, 3, S);
+                    ctx.fillRect(hw - 3, -hw, 3, S);
+                }
+
+                ctx.fillStyle = '#18232f';
+                ctx.fillRect(-hw, -1, S, 2);
+                ctx.fillRect(-hw + Math.round(S * 0.5) - 1, -hw, 2, S / 2);
+                ctx.fillRect(-hw + Math.round(S * 0.25) - 1, 0, 2, S / 2);
+
+                ctx.fillStyle = isReinforced ? '#86efac' : col;
+                ctx.globalAlpha = isReinforced ? 0.9 : 0.7;
+                for (const [bx, by] of [[-hw+2,-hw+2],[hw-2,-hw+2],[-hw+2,hw-2],[hw-2,hw-2]]) {
+                    ctx.fillRect(bx - 1, by - 1, 2, 2);
+                }
+                ctx.globalAlpha = 1;
+
+                ctx.strokeStyle = isReinforced ? '#86efac' : col;
+                ctx.lineWidth = 1;
+                ctx.globalAlpha = isReinforced ? 0.65 : 0.5;
+                ctx.strokeRect(-hw, -hw, S, S);
+                ctx.globalAlpha = 1;
+            }
+
+        } else {
+            // ── TURRET ────────────────────────────────────────────────────────
+            const subtype = b.st || 't';
+            const r = b.r || 18;
+
+            // Selection ring for the upgrade-selected turret
+            if (b.i === selectedTurret) {
+                ctx.beginPath(); ctx.arc(0, 0, r + 12, 0, Math.PI * 2);
+                ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2;
+                ctx.shadowColor = '#f59e0b'; ctx.shadowBlur = 16;
+                ctx.setLineDash([6, 4]); ctx.stroke();
+                ctx.setLineDash([]); ctx.shadowBlur = 0;
+            }
+
+            // All turrets use team colour — shape/design differentiates upgrades, not colour
+            const accentCol   = col;
+            const accentLight = light;
+
+            // Compute visual aim angle client-side: aim at closest enemy
+            let visualAngle = b.a || 0;
+            let bestDist = Infinity;
+            for (const e of enemies) {
+                if (e.team === b.tm) continue; // skip friendlies
+                const d = Math.hypot(e.x - b.x, e.y - b.y);
+                if (d < bestDist) {
+                    bestDist = d;
+                    visualAngle = Math.atan2(e.y - b.y, e.x - b.x);
+                }
+            }
+
+            // ── Quarry Shield Node: draw animated range ring beneath turret ────
+            if (subtype === 'bgm_qsn') {
+                const shieldR = 280;
+                const pulse2  = Math.sin(performance.now() / 900) * 0.5 + 0.5;
+                ctx.beginPath(); ctx.arc(0, 0, shieldR, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(134,239,172,${0.08 + pulse2 * 0.08})`;
+                ctx.lineWidth = 2; ctx.setLineDash([8, 12]); ctx.stroke(); ctx.setLineDash([]);
+                const shGrd = ctx.createRadialGradient(0, 0, r, 0, 0, shieldR);
+                shGrd.addColorStop(0, 'rgba(134,239,172,0.04)');
+                shGrd.addColorStop(1, 'rgba(134,239,172,0)');
+                ctx.fillStyle = shGrd;
+                ctx.beginPath(); ctx.arc(0, 0, shieldR, 0, Math.PI * 2); ctx.fill();
+            }
+
+            // ── EPA dominion: pulsing teal aura ring showing buff radius ─────────
+            if (subtype === 'epa_dominion') {
+                const domR  = 500;
+                const pulse2 = Math.sin(performance.now() / 700) * 0.5 + 0.5;
+                ctx.beginPath(); ctx.arc(0, 0, domR, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(52,211,153,${0.06 + pulse2 * 0.06})`;
+                ctx.lineWidth = 1.5; ctx.setLineDash([6, 12]); ctx.stroke(); ctx.setLineDash([]);
+            }
+
+            // ── EPA intercept/citadel: rotating intercept arc showing intercept radius ─
+            if (b.st === 'epa_fortress' || b.st === 'epa_knox' || b.st === 'epa_citadel') {
+                const intR  = 140;
+                const rot   = performance.now() / 2000;
+                ctx.save(); ctx.rotate(rot);
+                ctx.beginPath(); ctx.arc(0, 0, intR, 0, Math.PI * 0.5);
+                ctx.strokeStyle = 'rgba(167,139,250,0.18)'; ctx.lineWidth = 1.5; ctx.stroke();
+                ctx.rotate(Math.PI); ctx.beginPath(); ctx.arc(0, 0, intR, 0, Math.PI * 0.5);
+                ctx.stroke(); ctx.restore();
+            }
+
+            // Drop shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.beginPath(); ctx.arc(4, 5, r + 5, 0, Math.PI * 2); ctx.fill();
+
+            // Outer armoured base plate — faction-specific shape/style
+            const plateR = (subtype === 't_break' || subtype === 't_siege') ? r + 7 : r + 5;
+
+            if (bFaction === 'bgm') {
+                // BGM — heavy hexagonal industrial base, bolted steel
+                ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const a = (i / 6) * Math.PI * 2 - Math.PI / 6;
+                    i === 0 ? ctx.moveTo(Math.cos(a) * plateR, Math.sin(a) * plateR)
+                            : ctx.lineTo(Math.cos(a) * plateR, Math.sin(a) * plateR);
+                }
+                ctx.closePath();
+                ctx.fillStyle = '#1e150a'; ctx.fill();
+                ctx.strokeStyle = '#4a2e12'; ctx.lineWidth = 2.5; ctx.stroke();
+                // Hex bolt marks at each corner
+                ctx.fillStyle = '#f97316';
+                ctx.globalAlpha = 0.7;
+                for (let i = 0; i < 6; i++) {
+                    const a = (i / 6) * Math.PI * 2 - Math.PI / 6;
+                    const bx = Math.cos(a) * (plateR - 3), by = Math.sin(a) * (plateR - 3);
+                    ctx.beginPath(); ctx.arc(bx, by, 2, 0, Math.PI * 2); ctx.fill();
+                }
+                ctx.globalAlpha = 1;
+                // Track segments — orange tint
+                const segs = 8;
+                for (let i = 0; i < segs; i++) {
+                    const a0 = (i / segs) * Math.PI * 2;
+                    const a1 = a0 + (Math.PI * 2 / segs) * 0.55;
+                    ctx.beginPath(); ctx.arc(0, 0, plateR - 2, a0, a1);
+                    ctx.strokeStyle = accentCol + '66'; ctx.lineWidth = 5; ctx.stroke();
+                }
+
+            } else if (bFaction === 'epa') {
+                // EPA — octagonal precision base, slim cyan trim
+                ctx.beginPath();
+                for (let i = 0; i < 8; i++) {
+                    const a = (i / 8) * Math.PI * 2 - Math.PI / 8;
+                    i === 0 ? ctx.moveTo(Math.cos(a) * plateR, Math.sin(a) * plateR)
+                            : ctx.lineTo(Math.cos(a) * plateR, Math.sin(a) * plateR);
+                }
+                ctx.closePath();
+                ctx.fillStyle = '#081418'; ctx.fill();
+                ctx.strokeStyle = '#0c3040'; ctx.lineWidth = 2; ctx.stroke();
+                // Precision outer ring arc pairs
+                for (let i = 0; i < 4; i++) {
+                    const a0 = (i / 4) * Math.PI * 2;
+                    const a1 = a0 + Math.PI * 0.35;
+                    ctx.beginPath(); ctx.arc(0, 0, plateR - 1, a0, a1);
+                    ctx.strokeStyle = accentCol + '88'; ctx.lineWidth = 2.5; ctx.stroke();
+                }
+                // Tick marks
+                ctx.strokeStyle = accentCol + '55'; ctx.lineWidth = 1;
+                for (let i = 0; i < 12; i++) {
+                    const a = (i / 12) * Math.PI * 2;
+                    const inner = plateR - 5, outer = plateR - 2;
+                    ctx.beginPath();
+                    ctx.moveTo(Math.cos(a) * inner, Math.sin(a) * inner);
+                    ctx.lineTo(Math.cos(a) * outer, Math.sin(a) * outer);
+                    ctx.stroke();
+                }
+
+            } else {
+                // ROE — original circular armoured base
+                ctx.beginPath(); ctx.arc(0, 0, plateR, 0, Math.PI * 2);
+                ctx.fillStyle = '#1c2840'; ctx.fill();
+                ctx.strokeStyle = '#2d3f58'; ctx.lineWidth = 2; ctx.stroke();
+                // Segmented track ring
+                const segs = subtype === 't_storm' ? 12 : 10;
+                for (let i = 0; i < segs; i++) {
+                    const a0 = (i / segs) * Math.PI * 2;
+                    const a1 = a0 + (Math.PI * 2 / segs) * 0.62;
+                    ctx.beginPath(); ctx.arc(0, 0, plateR - 1, a0, a1);
+                    ctx.strokeStyle = accentCol + '55'; ctx.lineWidth = 4; ctx.stroke();
+                }
+            }
+
+            // Main chassis circle — faction-specific fill
+            const chassisFill = bFaction === 'bgm' ? '#1e1208' : bFaction === 'epa' ? '#060f14' : '#253044';
+            ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2);
+            ctx.fillStyle = chassisFill; ctx.fill();
+            ctx.strokeStyle = accentCol; ctx.lineWidth = 2;
+            ctx.shadowColor = accentCol; ctx.shadowBlur = 10;
+            ctx.stroke(); ctx.shadowBlur = 0;
+
+            // Hex texture lines
+            ctx.globalAlpha = 0.14;
+            ctx.strokeStyle = accentLight; ctx.lineWidth = 1;
+            for (let i = 0; i < 6; i++) {
+                const a = (i / 6) * Math.PI * 2;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(Math.cos(a) * r * 0.9, Math.sin(a) * r * 0.9);
+                ctx.stroke();
+            }
+            ctx.globalAlpha = 1;
+
+            // ── Rotating turret head ─────────────────────────────────────────
+            ctx.save();
+            ctx.rotate(visualAngle);
+
+            const hw2 = r * 0.45;
+
+            // ── BGM turret heads — their own housing + barrel logic ───────────
+            if (bFaction === 'bgm') {
+                // BGM housing: heavy bolted iron box
+                ctx.fillStyle = '#1a0f06';
+                ctx.fillRect(-hw2 * 1.1, -hw2 * 1.1, hw2 * 2.2, hw2 * 2.2);
+                ctx.strokeStyle = accentCol; ctx.lineWidth = 2; ctx.stroke();
+                // Corner bolts on housing
+                ctx.fillStyle = accentCol;
+                ctx.globalAlpha = 0.7;
+                for (const [hx, hy] of [[-hw2+2,-hw2+2],[hw2-2,-hw2+2],[-hw2+2,hw2-2],[hw2-2,hw2-2]]) {
+                    ctx.beginPath(); ctx.arc(hx, hy, 2, 0, Math.PI * 2); ctx.fill();
+                }
+                ctx.globalAlpha = 1;
+
+                if (subtype === 'bgm_drill') {
+                    // ── Drill Turret: rotating drill cone at the front ──────────
+                    const now2 = performance.now();
+                    const drillSpin = (now2 / 120) % (Math.PI * 2);
+                    // Drill body
+                    ctx.fillStyle = '#2a1a08';
+                    ctx.beginPath(); ctx.arc(hw2, 0, hw2 * 0.8, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = accentCol; ctx.lineWidth = 1.5; ctx.stroke();
+                    // Drill flutes (spinning)
+                    ctx.save(); ctx.translate(hw2, 0); ctx.rotate(drillSpin);
+                    ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 2;
+                    for (let f = 0; f < 3; f++) {
+                        const fa = (f / 3) * Math.PI * 2;
+                        ctx.beginPath();
+                        ctx.moveTo(0, 0);
+                        ctx.lineTo(Math.cos(fa) * hw2 * 0.75, Math.sin(fa) * hw2 * 0.75);
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+                    // Drill tip point
+                    ctx.fillStyle = '#ef4444';
+                    ctx.beginPath();
+                    ctx.moveTo(hw2 + hw2 * 0.8, 0);
+                    ctx.lineTo(hw2 + hw2 * 1.6, -4);
+                    ctx.lineTo(hw2 + hw2 * 2.0, 0);
+                    ctx.lineTo(hw2 + hw2 * 1.6, 4);
+                    ctx.closePath(); ctx.fill();
+                    // Beam glow when active (draw a short glowing line)
+                    ctx.strokeStyle = '#ef4444';
+                    ctx.lineWidth = 3;
+                    ctx.shadowColor = '#ef4444'; ctx.shadowBlur = 12;
+                    ctx.beginPath(); ctx.moveTo(hw2 * 0.5, 0); ctx.lineTo(hw2 * 2.4, 0); ctx.stroke();
+                    ctx.shadowBlur = 0;
+
+                } else if (subtype === 'bgm_rail') {
+                    // ── Rail Driver: single massive long barrel, railgun coils ──
+                    const bLen = r * 2.2;
+                    const bH   = 10;
+                    // Main barrel
+                    ctx.fillStyle = '#0d0a04';
+                    ctx.fillRect(hw2, -bH / 2 + 1, bLen, bH);
+                    ctx.fillStyle = '#3d2a10';
+                    ctx.fillRect(hw2, -bH / 2, bLen, bH - 1);
+                    // EM coil rings
+                    ctx.fillStyle = accentCol;
+                    ctx.globalAlpha = 0.8;
+                    for (let c = 0; c < 5; c++) {
+                        const cx2 = hw2 + 8 + c * (bLen * 0.16);
+                        ctx.fillRect(cx2, -bH / 2 - 3, 4, bH + 6);
+                    }
+                    ctx.globalAlpha = 1;
+                    // Muzzle glow
+                    ctx.strokeStyle = accentCol + 'dd'; ctx.lineWidth = 2;
+                    ctx.shadowColor = accentCol; ctx.shadowBlur = 14;
+                    ctx.strokeRect(hw2 + bLen - 5, -bH / 2 - 2, 7, bH + 4);
+                    ctx.shadowBlur = 0;
+
+                } else if (subtype === 'bgm_molt') {
+                    // ── Molten Projector: wide nozzle, glowing orange/red ───────
+                    const bLen = r * 1.1;
+                    const bH   = 14;
+                    ctx.fillStyle = '#1a0800';
+                    ctx.fillRect(hw2, -bH / 2 + 1, bLen, bH);
+                    ctx.fillStyle = '#3d1500';
+                    ctx.fillRect(hw2, -bH / 2, bLen, bH - 1);
+                    // Heat vents
+                    ctx.fillStyle = '#f97316'; ctx.globalAlpha = 0.5;
+                    for (let v = 0; v < 4; v++) {
+                        ctx.fillRect(hw2 + 4 + v * 6, -bH / 2 - 1, 4, bH + 2);
+                    }
+                    ctx.globalAlpha = 1;
+                    // Flared nozzle
+                    ctx.fillStyle = '#0d0400';
+                    ctx.beginPath();
+                    ctx.moveTo(hw2 + bLen, -bH / 2 - 5);
+                    ctx.lineTo(hw2 + bLen + 10, -bH / 2 - 8);
+                    ctx.lineTo(hw2 + bLen + 10, bH / 2 + 8);
+                    ctx.lineTo(hw2 + bLen, bH / 2 + 5);
+                    ctx.closePath(); ctx.fill();
+                    // Nozzle glow
+                    ctx.strokeStyle = '#f97316'; ctx.lineWidth = 2;
+                    ctx.shadowColor = '#f97316'; ctx.shadowBlur = 16;
+                    ctx.beginPath();
+                    ctx.moveTo(hw2 + bLen + 1, -bH / 2 - 6);
+                    ctx.lineTo(hw2 + bLen + 10, -bH / 2 - 8);
+                    ctx.lineTo(hw2 + bLen + 10, bH / 2 + 8);
+                    ctx.lineTo(hw2 + bLen + 1, bH / 2 + 6);
+                    ctx.stroke(); ctx.shadowBlur = 0;
+
+                } else if (subtype === 'bgm_qsn') {
+                    // ── Quarry Shield Node: no barrel, radiating shield emitter ─
+                    // Rotating emitter arm
+                    const now2 = performance.now();
+                    const armAngle = now2 / 1200;
+                    ctx.save(); ctx.rotate(armAngle);
+                    ctx.strokeStyle = '#86efac'; ctx.lineWidth = 3;
+                    ctx.shadowColor = '#86efac'; ctx.shadowBlur = 12;
+                    ctx.beginPath(); ctx.moveTo(-r * 0.6, 0); ctx.lineTo(r * 0.6, 0); ctx.stroke();
+                    ctx.restore();
+                    ctx.save(); ctx.rotate(armAngle + Math.PI / 2);
+                    ctx.strokeStyle = '#86efac44'; ctx.lineWidth = 1.5; ctx.shadowBlur = 6;
+                    ctx.beginPath(); ctx.moveTo(-r * 0.4, 0); ctx.lineTo(r * 0.4, 0); ctx.stroke();
+                    ctx.shadowBlur = 0; ctx.restore();
+                    // Central emitter orb
+                    ctx.beginPath(); ctx.arc(0, 0, r * 0.35, 0, Math.PI * 2);
+                    ctx.fillStyle = '#86efac33'; ctx.fill();
+                    ctx.strokeStyle = '#86efac'; ctx.lineWidth = 2;
+                    ctx.shadowColor = '#86efac'; ctx.shadowBlur = 10;
+                    ctx.stroke(); ctx.shadowBlur = 0;
+
+                } else {
+                    // ── BGM base — Excavator Node: thick industrial barrel ──────
+                    const bLen = r * 1.1;
+                    const bH   = 9;
+                    ctx.fillStyle = '#0d0a04';
+                    ctx.fillRect(hw2, -bH / 2 + 1, bLen, bH);
+                    ctx.fillStyle = '#3d2a10';
+                    ctx.fillRect(hw2, -bH / 2, bLen, bH - 1);
+                    ctx.fillStyle = accentCol + '66';
+                    ctx.fillRect(hw2, -bH / 2, bLen, 2.5);
+                    // Ridge bands
+                    ctx.fillStyle = '#1a0f06';
+                    const ridges = 2;
+                    for (let v = 0; v < ridges; v++) {
+                        ctx.fillRect(hw2 + 5 + v * 8, -bH / 2, 4, bH);
+                    }
+                    // Muzzle block
+                    const mx = hw2 + bLen - 7;
+                    ctx.fillStyle = '#0a0604';
+                    ctx.fillRect(mx, -bH / 2 - 3, 12, bH + 6);
+                    ctx.strokeStyle = accentCol + 'bb'; ctx.lineWidth = 1.5;
+                    ctx.shadowColor = accentCol; ctx.shadowBlur = 6;
+                    ctx.strokeRect(mx, -bH / 2 - 1, 11, bH + 2);
+                    ctx.shadowBlur = 0;
+                }
+
+            } else if (bFaction === 'epa') {
+                // ── EPA turret heads — octagonal precision housings ──────────────
+                const now2 = performance.now();
+
+                // Octagonal housing for all EPA
+                const hSize = (subtype === 'epa_mk3' || subtype === 'epa_citadel') ? hw2 * 1.25 : hw2;
+                ctx.beginPath();
+                for (let i = 0; i < 8; i++) {
+                    const a = (i / 8) * Math.PI * 2 - Math.PI / 8;
+                    const hr = hSize;
+                    i === 0 ? ctx.moveTo(Math.cos(a) * hr, Math.sin(a) * hr)
+                            : ctx.lineTo(Math.cos(a) * hr, Math.sin(a) * hr);
+                }
+                ctx.closePath();
+                ctx.fillStyle = '#060f14'; ctx.fill();
+                ctx.strokeStyle = accentCol; ctx.lineWidth = 1.5; ctx.stroke();
+                // Precision inset
+                ctx.beginPath();
+                for (let i = 0; i < 8; i++) {
+                    const a = (i / 8) * Math.PI * 2 - Math.PI / 8;
+                    const hr = hSize - 3;
+                    i === 0 ? ctx.moveTo(Math.cos(a) * hr, Math.sin(a) * hr)
+                            : ctx.lineTo(Math.cos(a) * hr, Math.sin(a) * hr);
+                }
+                ctx.closePath();
+                ctx.strokeStyle = accentCol + '44'; ctx.lineWidth = 0.8; ctx.stroke();
+
+                // Mantlet circle
+                ctx.beginPath(); ctx.arc(hw2, 0, hw2 * 0.65, 0, Math.PI * 2);
+                ctx.fillStyle = '#0c1e26'; ctx.fill();
+                ctx.strokeStyle = accentCol; ctx.lineWidth = 1.5; ctx.stroke();
+
+                if (subtype === 'epa_citadel') {
+                    // ── Citadel Array: triple cannon cluster + rotating shield arc ─
+                    // Shield arc rotating around the housing
+                    const shieldRot = now2 / 1800;
+                    ctx.save(); ctx.rotate(shieldRot);
+                    ctx.beginPath(); ctx.arc(0, 0, hSize + 7, 0, Math.PI * 1.1);
+                    ctx.strokeStyle = accentCol + 'cc'; ctx.lineWidth = 3;
+                    ctx.shadowColor = accentCol; ctx.shadowBlur = 10;
+                    ctx.stroke(); ctx.shadowBlur = 0; ctx.restore();
+
+                    // Triple barrels
+                    for (const yOff of [-6, 0, 6]) {
+                        const bLen = yOff === 0 ? r * 1.5 : r * 1.2;
+                        ctx.fillStyle = '#0a1520';
+                        ctx.fillRect(hw2, yOff - 2 + 1, bLen, 4);
+                        ctx.fillStyle = '#1e3550';
+                        ctx.fillRect(hw2, yOff - 2, bLen, 3);
+                        ctx.fillStyle = accentCol + '99';
+                        ctx.fillRect(hw2, yOff - 2, bLen, 1);
+                    }
+                    // Gold muzzle glow on centre barrel
+                    ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 1.5;
+                    ctx.shadowColor = '#f59e0b'; ctx.shadowBlur = 10;
+                    ctx.strokeRect(hw2 + r * 1.5 - 5, -3, 8, 6);
+                    ctx.shadowBlur = 0;
+
+                } else if (subtype === 'epa_fortress' || subtype === 'epa_knox') {
+                    // ── Fortress/Knox: dual (or triple) barrels, thick plating ──────
+                    const bLen = subtype === 'epa_knox' ? r * 1.35 : r * 1.2;
+                    const bH   = 5;
+                    const yOffsets = subtype === 'epa_knox' ? [-6, 0, 6] : [-5, 5];
+                    for (const yOff of yOffsets) {
+                        ctx.fillStyle = '#0a1520';
+                        ctx.fillRect(hw2, yOff - bH / 2 + 1, bLen, bH);
+                        ctx.fillStyle = '#1e3550';
+                        ctx.fillRect(hw2, yOff - bH / 2, bLen, bH - 1);
+                        ctx.fillStyle = accentCol + '66';
+                        ctx.fillRect(hw2, yOff - bH / 2, bLen, 1.5);
+                    }
+                    // Intercept arc flash (subtle rotating arc)
+                    const intRot = now2 / 2200;
+                    ctx.save(); ctx.rotate(intRot);
+                    ctx.beginPath(); ctx.arc(0, 0, hSize + 5, 0, Math.PI * 0.6);
+                    ctx.strokeStyle = '#a78bfa55'; ctx.lineWidth = 2; ctx.stroke();
+                    ctx.restore();
+
+                } else if (subtype === 'epa_dominion') {
+                    // ── Dominion Battery: single barrel + outward aura rings ────────
+                    const bLen = r * 1.3;
+                    const bH   = 7;
+                    ctx.fillStyle = '#0a1520';
+                    ctx.fillRect(hw2, -bH / 2 + 1, bLen, bH);
+                    ctx.fillStyle = '#1e3550';
+                    ctx.fillRect(hw2, -bH / 2, bLen, bH - 1);
+                    ctx.fillStyle = '#34d399' + '99';
+                    ctx.fillRect(hw2, -bH / 2, bLen, 2);
+                    // Pulsing aura ring
+                    const domPulse = Math.sin(now2 / 600) * 0.5 + 0.5;
+                    ctx.beginPath(); ctx.arc(0, 0, hSize + 8 + domPulse * 4, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(52,211,153,${0.2 + domPulse * 0.25})`;
+                    ctx.lineWidth = 2; ctx.setLineDash([4, 8]); ctx.stroke();
+                    ctx.setLineDash([]);
+
+                } else {
+                    // ── Aegis Platform / Mk-II / Mk-III — single precision barrel ─
+                    const bLen = subtype === 'epa_mk3' ? r * 1.55 : subtype === 'epa_mk2' ? r * 1.35 : r * 1.1;
+                    const bH   = subtype === 'epa_mk3' ? 8 : 6;
+                    ctx.fillStyle = '#0a1520';
+                    ctx.fillRect(hw2, -bH / 2 + 1, bLen, bH);
+                    ctx.fillStyle = '#1e3550';
+                    ctx.fillRect(hw2, -bH / 2, bLen, bH - 1);
+                    ctx.fillStyle = accentCol + '77';
+                    ctx.fillRect(hw2, -bH / 2, bLen, 1.5);
+                    // Muzzle glow
+                    const mX = hw2 + bLen - 5;
+                    ctx.strokeStyle = accentCol + 'cc'; ctx.lineWidth = 1.5;
+                    ctx.shadowColor = accentCol; ctx.shadowBlur = 8;
+                    ctx.strokeRect(mX, -bH / 2 - 1, 7, bH + 2);
+                    ctx.shadowBlur = 0;
+                    // Mk-III extra range ring
+                    if (subtype === 'epa_mk3') {
+                        const p3 = Math.sin(now2 / 800) * 0.4 + 0.6;
+                        ctx.beginPath(); ctx.arc(0, 0, hSize + 6, 0, Math.PI * 2);
+                        ctx.strokeStyle = `rgba(6,182,212,${0.12 * p3})`; ctx.lineWidth = 1.5; ctx.stroke();
+                    }
+                }
+
+            } else {
+                // ── ROE / fallback turret heads ─────────────────────────────────
+                // Turret housing (varies by subtype)
+                if (subtype === 't_mk3' || subtype === 't_siege') {
+                    // Larger, reinforced housing
+                    ctx.fillStyle = '#1a2738';
+                    ctx.fillRect(-hw2 * 1.2, -hw2 * 1.2, hw2 * 2.4, hw2 * 2.4);
+                    ctx.strokeStyle = accentCol; ctx.lineWidth = 2; ctx.stroke();
+                    ctx.strokeStyle = accentCol + '55'; ctx.lineWidth = 0.8;
+                    ctx.strokeRect(-hw2 * 1.2 + 3, -hw2 * 1.2 + 3, hw2 * 2.4 - 6, hw2 * 2.4 - 6);
+                } else {
+                    ctx.fillStyle = '#1e2d40';
+                    ctx.fillRect(-hw2, -hw2, hw2 * 2, hw2 * 2);
+                    ctx.strokeStyle = accentCol; ctx.lineWidth = 1.5; ctx.stroke();
+                    ctx.strokeStyle = accentCol + '44'; ctx.lineWidth = 0.8; ctx.globalAlpha = 0.6;
+                    ctx.strokeRect(-hw2 + 2, -hw2 + 2, hw2 * 2 - 4, hw2 * 2 - 4);
+                    ctx.globalAlpha = 1;
+                }
+
+                // Mantlet
+                ctx.beginPath(); ctx.arc(hw2, 0, hw2 * 0.7, 0, Math.PI * 2);
+                ctx.fillStyle = '#263347'; ctx.fill();
+                ctx.strokeStyle = accentCol; ctx.lineWidth = 1.5; ctx.stroke();
+
+                // ── Barrel(s) ────────────────────────────────────────────────────
+                const barrelStart = hw2;
+
+                if (subtype === 't_storm') {
+                    // ── Dual barrels (Storm Suppressor)
+                    for (const yOff of [-5, 5]) {
+                        ctx.fillStyle = '#111a27';
+                        ctx.fillRect(barrelStart, yOff - 2.5, r * 0.9, 5);
+                        ctx.fillStyle = '#2a3d55';
+                        ctx.fillRect(barrelStart, yOff - 2.5, r * 0.9, 4);
+                        ctx.fillStyle = '#3d5472';
+                        ctx.fillRect(barrelStart, yOff - 2.5, r * 0.9, 1.5);
+                        // Vent slits on each barrel
+                        ctx.fillStyle = '#0d1520';
+                        for (let v = 0; v < 3; v++) {
+                            ctx.fillRect(barrelStart + 4 + v * 5, yOff - 2, 3, 4);
+                        }
+                    }
+                } else if (subtype === 't_supp') {
+                    // ── Stubby vented barrel (Suppressor)
+                    const bLen = r * 0.75;
+                    const bH   = 6;
+                    ctx.fillStyle = '#111a27';
+                    ctx.fillRect(barrelStart, -bH / 2 + 1, bLen, bH);
+                    ctx.fillStyle = '#2a3d55';
+                    ctx.fillRect(barrelStart, -bH / 2, bLen, bH - 1);
+                    ctx.fillStyle = '#3d5472';
+                    ctx.fillRect(barrelStart, -bH / 2, bLen, 2);
+                    // Vent ports
+                    ctx.fillStyle = '#0d1520';
+                    for (let v = 0; v < 5; v++) {
+                        ctx.fillRect(barrelStart + 3 + v * 6, -bH / 2 - 1, 4, bH + 2);
+                    }
+                } else if (subtype === 't_break' || subtype === 't_siege') {
+                    // ── Massive barrel (Breaker / Siege)
+                    const bLen = r * (subtype === 't_siege' ? 1.35 : 1.2);
+                    const bH   = subtype === 't_siege' ? 14 : 12;
+                    ctx.fillStyle = '#0f1826';
+                    ctx.fillRect(barrelStart, -bH / 2 + 1, bLen, bH);
+                    ctx.fillStyle = '#2a3d55';
+                    ctx.fillRect(barrelStart, -bH / 2, bLen, bH - 1);
+                    ctx.fillStyle = accentCol + '99';
+                    ctx.fillRect(barrelStart, -bH / 2, bLen, 2.5);
+                    // Ridge bands
+                    ctx.fillStyle = '#1a2a3e';
+                    for (let v = 0; v < 3; v++) {
+                        ctx.fillRect(barrelStart + 6 + v * 9, -bH / 2, 5, bH);
+                    }
+                    // Giant muzzle brake
+                    const mX = barrelStart + bLen - 8;
+                    ctx.fillStyle = '#131e2d';
+                    ctx.fillRect(mX, -bH / 2 - 4, 14, bH + 8);
+                    ctx.fillStyle = '#0a1017';
+                    ctx.fillRect(mX + 1, -bH / 2 - 2, 5, bH + 4);
+                    ctx.fillRect(mX + 8, -bH / 2 - 2, 4, bH + 4);
+                    // Glow ring at muzzle
+                    ctx.strokeStyle = accentCol + 'cc'; ctx.lineWidth = 1.5;
+                    ctx.shadowColor = accentCol; ctx.shadowBlur = 8;
+                    ctx.strokeRect(mX + 1, -bH / 2, 12, bH);
+                    ctx.shadowBlur = 0;
+                } else {
+                    // ── Standard barrel (MK-I, MK-II, MK-III)
+                    const bLen = subtype === 't_mk3' ? r * 1.5 : subtype === 't_mk2' ? r * 1.3 : r * 1.1;
+                    const bH   = subtype === 't_mk3' ? 9 : 7;
+                    ctx.fillStyle = '#111a27';
+                    ctx.fillRect(barrelStart, -bH / 2 + 1, bLen, bH);
+                    ctx.fillStyle = '#2a3d55';
+                    ctx.fillRect(barrelStart, -bH / 2, bLen, bH - 1);
+                    ctx.fillStyle = '#3d5472';
+                    ctx.fillRect(barrelStart, -bH / 2, bLen, 2.5);
+                    // Muzzle brake
+                    const muzzleX = barrelStart + bLen - 6;
+                    ctx.fillStyle = '#1c2a3a';
+                    ctx.fillRect(muzzleX, -bH / 2 - 2.5, 10, bH + 5);
+                    ctx.fillStyle = '#0d1520';
+                    ctx.fillRect(muzzleX + 1, -bH / 2 - 1.5, 3, bH + 3);
+                    ctx.fillRect(muzzleX + 5, -bH / 2 - 1.5, 3, bH + 3);
+                    // MK-III extra glow on barrel
+                    if (subtype === 't_mk3') {
+                        ctx.strokeStyle = accentCol + 'aa'; ctx.lineWidth = 1;
+                        ctx.shadowColor = accentCol; ctx.shadowBlur = 6;
+                        ctx.strokeRect(barrelStart, -bH / 2, bLen - 6, bH);
+                        ctx.shadowBlur = 0;
+                    }
+                }
+            }
+
+            ctx.restore(); // end turret rotation
+
+            // Centre pin (always on top)
+            ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2);
+            ctx.fillStyle = dark; ctx.fill();
+            ctx.strokeStyle = accentCol; ctx.lineWidth = 1.5; ctx.stroke();
+            ctx.beginPath(); ctx.arc(0, 0, 1.8, 0, Math.PI * 2);
+            ctx.fillStyle = accentLight; ctx.fill();
+        }
+
+        // ── HP bar + name label — counter-rotated ──────────────────────────────
+        const hpF = Math.max(0, b.hp / b.mhp);
+        if (b.tp === 't' || hpF < 1) {
+            ctx.save();
+            ctx.rotate(-camRot);
+            const baseR  = b.tp === 'w' ? 0 : (b.r || 18);
+            const barW   = b.tp === 'w' ? 46 : 44;
+            const barY   = b.tp === 'w' ? -hw - 12 : -baseR - 18;
+
+            // Subtype label — always visible for turrets
+            if (b.tp === 't') {
+                const subtype = b.st || 't';
+                const shortLabel = {
+                    't':          'MK-I',  't_mk2':    'MK-II',    't_mk3':      'MK-III',
+                    't_supp':     'SUPR',  't_storm':  'STRM',
+                    't_break':    'BRKR',  't_siege':  'SIEG',
+                    'bgm_t':      'EXCV',
+                    'bgm_drill':  'DRIL',  'bgm_rail': 'RAIL',
+                    'bgm_molt':   'MOLT',  'bgm_qsn':  'QSN',
+                    'epa_t':      'AGIS',  'epa_mk2':  'MK-II',    'epa_mk3':    'MK-III',
+                    'epa_fortress':'FORT', 'epa_knox': 'KNOX',
+                    'epa_dominion':'DOM',  'epa_citadel':'CITD',
+                }[subtype] || subtype.toUpperCase();
+                ctx.font = 'bold 13px "Barlow Condensed", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillStyle = light;
+                ctx.globalAlpha = 0.7;
+                ctx.fillText(shortLabel, 0, barY - 5);
+                ctx.globalAlpha = 1;
+            }
+
+            if (hpF < 1) {
+                ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                ctx.fillRect(-barW / 2, barY, barW, 5);
+                ctx.fillStyle = hpF > 0.5 ? '#22c55e' : '#ef4444';
+                ctx.fillRect(-barW / 2, barY, barW * hpF, 5);
+                ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+                ctx.lineWidth = 0.5;
+                ctx.strokeRect(-barW / 2, barY, barW, 5);
+            }
+            ctx.restore();
+        }
+
+        ctx.restore();
+    }
+}
+
+// ── Cores ──────────────────────────────────────────────────────────────────────
+function drawCores() {
+    const now = performance.now();
+    coreData.forEach((c, idx) => {
+        const hp      = coreHPs[idx];
+        const hpR     = Math.max(0, hp / c.mhp);
+        const pulse   = Math.sin(now / 700) * 0.5 + 0.5;
+        const rotA    =  now / 3200;
+        const rotB    = -now / 2200;
+        const isRed   = c.tm === 0;
+        const faction = teamFactions[c.tm] || 'roe';
+        const fdef    = FACTIONS[faction] || FACTIONS['roe'];
+
+        // Base team tones — faction overrides accent colour
+        const col   = faction === 'bgm' ? '#f97316' : faction === 'epa' ? '#22d3ee' : (isRed ? '#dc2626' : '#2563eb');
+        const colLt = faction === 'bgm' ? '#fed7aa' : faction === 'epa' ? '#a5f3fc' : (isRed ? '#fca5a5' : '#93c5fd');
+        const colDk = faction === 'bgm' ? '#7c2d12' : faction === 'epa' ? '#164e63' : (isRed ? '#7f1d1d' : '#1e3a8a');
+
+        ctx.save();
+        ctx.translate(c.x, c.y);
+
+        // Glow aura
+        const glowR = c.r * (1.7 + pulse * 0.25);
+        const grd   = ctx.createRadialGradient(0, 0, c.r * 0.4, 0, 0, glowR);
+        grd.addColorStop(0, col + '60');
+        grd.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = grd;
+        ctx.beginPath(); ctx.arc(0, 0, glowR, 0, Math.PI*2); ctx.fill();
+
+        if (faction === 'bgm') {
+            // BGM — heavy hexagonal fortress core with gear-like ring
+            ctx.save(); ctx.rotate(rotA * 0.5);
+            for (let i = 0; i < 6; i++) {
+                const a0 = (i / 6) * Math.PI * 2;
+                const a1 = a0 + (Math.PI * 2 / 6) * 0.6;
+                ctx.beginPath(); ctx.arc(0, 0, c.r + 14, a0, a1);
+                ctx.strokeStyle = col; ctx.lineWidth = 5; ctx.stroke();
+            }
+            ctx.restore();
+
+            ctx.save(); ctx.rotate(rotB * 0.4);
+            ctx.globalAlpha = 0.35 + pulse * 0.3;
+            for (let i = 0; i < 4; i++) {
+                const a0 = (i / 4) * Math.PI * 2;
+                const a1 = a0 + (Math.PI * 2 / 4) * 0.3;
+                ctx.beginPath(); ctx.arc(0, 0, c.r + 24, a0, a1);
+                ctx.strokeStyle = colLt; ctx.lineWidth = 2; ctx.stroke();
+            }
+            ctx.globalAlpha = 1; ctx.restore();
+
+            // Hex outer body
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const a = (i / 6) * Math.PI * 2;
+                i === 0 ? ctx.moveTo(Math.cos(a) * c.r, Math.sin(a) * c.r)
+                        : ctx.lineTo(Math.cos(a) * c.r, Math.sin(a) * c.r);
+            }
+            ctx.closePath();
+            ctx.fillStyle = colDk; ctx.fill();
+            ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.stroke();
+
+            // Inner ore crystal — rotating diamond
+            ctx.save(); ctx.rotate(rotA * 0.6);
+            ctx.beginPath();
+            ctx.moveTo(0, -c.r * 0.55); ctx.lineTo(c.r * 0.55, 0);
+            ctx.lineTo(0, c.r * 0.55); ctx.lineTo(-c.r * 0.55, 0);
+            ctx.closePath();
+            ctx.fillStyle = col; ctx.fill();
+            ctx.restore();
+
+            ctx.save(); ctx.rotate(rotB * 0.8);
+            ctx.beginPath();
+            ctx.moveTo(0, -c.r * 0.28); ctx.lineTo(c.r * 0.28, 0);
+            ctx.lineTo(0, c.r * 0.28); ctx.lineTo(-c.r * 0.28, 0);
+            ctx.closePath();
+            ctx.fillStyle = colDk; ctx.fill();
+            ctx.strokeStyle = colLt; ctx.lineWidth = 1.5; ctx.stroke();
+            ctx.restore();
+
+        } else if (faction === 'epa') {
+            // EPA — precision octagonal shield core, scanning rings
+            ctx.save(); ctx.rotate(rotA);
+            for (let i = 0; i < 8; i++) {
+                const a0 = (i / 8) * Math.PI * 2;
+                const a1 = a0 + (Math.PI * 2 / 8) * 0.45;
+                ctx.beginPath(); ctx.arc(0, 0, c.r + 13, a0, a1);
+                ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.stroke();
+            }
+            ctx.restore();
+
+            ctx.save(); ctx.rotate(rotB);
+            ctx.globalAlpha = 0.45 + pulse * 0.3;
+            for (let i = 0; i < 6; i++) {
+                const a0 = (i / 6) * Math.PI * 2;
+                const a1 = a0 + (Math.PI * 2 / 6) * 0.3;
+                ctx.beginPath(); ctx.arc(0, 0, c.r + 22, a0, a1);
+                ctx.strokeStyle = colLt; ctx.lineWidth = 1.5; ctx.stroke();
+            }
+            ctx.globalAlpha = 1; ctx.restore();
+
+            // Octagonal body
+            ctx.beginPath();
+            for (let i = 0; i < 8; i++) {
+                const a = (i / 8) * Math.PI * 2 - Math.PI / 8;
+                i === 0 ? ctx.moveTo(Math.cos(a) * c.r, Math.sin(a) * c.r)
+                        : ctx.lineTo(Math.cos(a) * c.r, Math.sin(a) * c.r);
+            }
+            ctx.closePath();
+            ctx.fillStyle = colDk; ctx.fill();
+            ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.stroke();
+
+            // Rotating cross-sight inner
+            ctx.save(); ctx.rotate(rotA * 0.6);
+            ctx.strokeStyle = col; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(-c.r * 0.5, 0); ctx.lineTo(c.r * 0.5, 0); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, -c.r * 0.5); ctx.lineTo(0, c.r * 0.5); ctx.stroke();
+            ctx.restore();
+
+            ctx.save(); ctx.rotate(rotB * 0.8);
+            ctx.beginPath(); ctx.arc(0, 0, c.r * 0.28, 0, Math.PI * 2);
+            ctx.fillStyle = colDk; ctx.fill();
+            ctx.strokeStyle = colLt; ctx.lineWidth = 1.5; ctx.stroke();
+            ctx.restore();
+
+        } else {
+            // ROE — original diamond-ring core
+            ctx.save(); ctx.rotate(rotA);
+            for (let i = 0; i < 8; i++) {
+                const a0 = (i / 8) * Math.PI * 2;
+                const a1 = a0 + (Math.PI * 2 / 8) * 0.55;
+                ctx.beginPath(); ctx.arc(0, 0, c.r + 13, a0, a1);
+                ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.stroke();
+            }
+            ctx.restore();
+
+            ctx.save(); ctx.rotate(rotB);
+            ctx.globalAlpha = 0.45 + pulse * 0.3;
+            for (let i = 0; i < 5; i++) {
+                const a0 = (i / 5) * Math.PI * 2;
+                const a1 = a0 + (Math.PI * 2 / 5) * 0.38;
+                ctx.beginPath(); ctx.arc(0, 0, c.r + 22, a0, a1);
+                ctx.strokeStyle = colLt; ctx.lineWidth = 1.5; ctx.stroke();
+            }
+            ctx.globalAlpha = 1; ctx.restore();
+
+            ctx.beginPath(); ctx.arc(0, 0, c.r, 0, Math.PI*2);
+            ctx.fillStyle = colDk; ctx.fill();
+            ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.stroke();
+
+            ctx.save(); ctx.rotate(rotA * 0.6);
+            ctx.beginPath();
+            ctx.moveTo(0, -c.r * 0.57); ctx.lineTo(c.r * 0.57, 0);
+            ctx.lineTo(0, c.r * 0.57); ctx.lineTo(-c.r * 0.57, 0);
+            ctx.closePath();
+            ctx.fillStyle = col; ctx.fill();
+            ctx.restore();
+
+            ctx.save(); ctx.rotate(rotB * 0.8);
+            ctx.beginPath();
+            ctx.moveTo(0, -c.r * 0.3); ctx.lineTo(c.r * 0.3, 0);
+            ctx.lineTo(0, c.r * 0.3); ctx.lineTo(-c.r * 0.3, 0);
+            ctx.closePath();
+            ctx.fillStyle = colDk; ctx.fill();
+            ctx.strokeStyle = colLt; ctx.lineWidth = 1.5; ctx.stroke();
+            ctx.restore();
+        }
+
+        ctx.beginPath(); ctx.arc(0, 0, c.r * 0.14, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.fill();
+
+        // HP bar and label — counter-rotated so always readable
+        ctx.save();
+        ctx.rotate(-getCamRotation());
+
+        ctx.fillStyle = colLt;
+        ctx.font = 'bold 16px "Barlow Condensed", sans-serif';
+        ctx.textAlign = 'center';
+        // Label shows faction short name
+        const coreLabel = `${fdef.short} ${isRed ? 'RED' : 'BLUE'} CORE`;
+        ctx.fillText(coreLabel, 0, -c.r - 26);
+
+        if (hpR < 1) {
+            const bW = c.r * 2.2;
+            const bY = -c.r - 18;
+            ctx.fillStyle = 'rgba(0,0,0,0.65)';
+            ctx.fillRect(-bW/2, bY, bW, 7);
+            ctx.fillStyle = hpR > 0.5 ? '#22c55e' : hpR > 0.25 ? '#f59e0b' : '#ef4444';
+            ctx.fillRect(-bW/2, bY, bW * hpR, 7);
+            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(-bW/2, bY, bW, 7);
+        }
+
+        ctx.restore();
+        ctx.restore();
+    });
+}
+
+// ── Projectiles ────────────────────────────────────────────────────────────────
+function drawProjectiles() {
+    const now = performance.now();
+    for (const [id, pj] of localProjectiles) {
+        const dt = (now - pj.t0) / 1000;
+        if (dt > 2.1) { localProjectiles.delete(id); continue; }
+        const x = pj.x + Math.cos(pj.a) * pj.spd * dt;
+        const y = pj.y + Math.sin(pj.a) * pj.spd * dt;
+
+        const isRed = pj.team === 0;
+        const pt    = pj.pt || 'pl';
+
+        // Per-type colour + sizing
+        let col, glow, baseR;
+        if (pt === 't_supp' || pt === 't_storm') {
+            col = isRed ? '#fdba74' : '#7dd3fc'; glow = isRed ? '#f97316' : '#0ea5e9';
+            baseR = pj.r || 4;
+        } else if (pt === 't_break' || pt === 't_siege') {
+            col = isRed ? '#fde047' : '#a5f3fc'; glow = isRed ? '#ca8a04' : '#0891b2';
+            baseR = pj.r || 9;
+        } else if (pt === 't_mk2' || pt === 't_mk3') {
+            col = isRed ? '#fca5a5' : '#93c5fd'; glow = isRed ? '#dc2626' : '#2563eb';
+            baseR = (pj.r || 5) + 1;
+        // ── BGM projectile types ────────────────────────────────────────────────
+        } else if (pt === 'bgm_drill') {
+            // Drill beam: short-lived, wide reddish beam segment — skip standard circle draw
+            ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 5;
+            ctx.shadowColor = '#ef4444'; ctx.shadowBlur = 16;
+            const tx = pj.x + Math.cos(pj.a) * 40;
+            const ty = pj.y + Math.sin(pj.a) * 40;
+            ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.moveTo(pj.x, pj.y); ctx.lineTo(tx, ty); ctx.stroke();
+            ctx.shadowBlur = 0; ctx.lineCap = 'butt';
+            continue; // skip standard draw below
+        } else if (pt === 'bgm_rail') {
+            col = '#fbbf24'; glow = '#d97706';
+            baseR = pj.r || 12;
+        } else if (pt === 'bgm_molt') {
+            col = '#f97316'; glow = '#ea580c';
+            baseR = pj.r || 14;
+        } else if (pt === 'bgm_t') {
+            col = '#f97316'; glow = '#c2410c';
+            baseR = pj.r || 8;
+        } else if (pt === 'bgm_w_thermal') {
+            col = '#ef4444'; glow = '#b91c1c';
+            baseR = pj.r || 5;
+        } else if (pt === 'epa_t' || pt === 'epa_mk2' || pt === 'epa_mk3') {
+            col = '#a5f3fc'; glow = '#22d3ee';
+            baseR = pj.r || 5;
+        } else if (pt === 'epa_fortress' || pt === 'epa_knox') {
+            col = '#c4b5fd'; glow = '#7c3aed';
+            baseR = pj.r || 6;
+        } else if (pt === 'epa_dominion') {
+            col = '#6ee7b7'; glow = '#10b981';
+            baseR = pj.r || 5;
+        } else if (pt === 'epa_citadel') {
+            col = '#fde68a'; glow = '#f59e0b';
+            baseR = pj.r || 6;
+        } else {
+            col = isRed ? '#fca5a5' : '#93c5fd'; glow = isRed ? '#dc2626' : '#2563eb';
+            baseR = pj.r || 5;
+        }
+
+        ctx.shadowColor = glow;
+        ctx.shadowBlur  = (pt === 't_break' || pt === 't_siege' || pt === 'bgm_rail') ? 22 : 14;
+
+        // Outer glow halo
+        ctx.beginPath(); ctx.arc(x, y, baseR + 2, 0, Math.PI * 2);
+        ctx.fillStyle = col + '44'; ctx.fill();
+
+        // Main bullet body
+        ctx.beginPath(); ctx.arc(x, y, baseR, 0, Math.PI * 2);
+        ctx.fillStyle = col; ctx.fill();
+
+        ctx.shadowBlur = 0;
+
+        // Inner bright core
+        ctx.beginPath(); ctx.arc(x, y, baseR * 0.4, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.88)'; ctx.fill();
+
+        // Motion trail for fast small rounds (suppressor / storm)
+        if (pt === 't_supp' || pt === 't_storm') {
+            const tx = x - Math.cos(pj.a) * 14;
+            const ty = y - Math.sin(pj.a) * 14;
+            const grad = ctx.createLinearGradient(x, y, tx, ty);
+            grad.addColorStop(0, col + 'bb');
+            grad.addColorStop(1, 'transparent');
+            ctx.strokeStyle = grad;
+            ctx.lineWidth   = baseR * 1.5;
+            ctx.lineCap     = 'round';
+            ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(tx, ty); ctx.stroke();
+            ctx.lineCap = 'butt';
+        }
+        // Molten slurry: dripping orange trail
+        if (pt === 'bgm_molt') {
+            const tx = x - Math.cos(pj.a) * 22;
+            const ty = y - Math.sin(pj.a) * 22;
+            const grad = ctx.createLinearGradient(x, y, tx, ty);
+            grad.addColorStop(0, '#f97316cc');
+            grad.addColorStop(0.5, '#ef4444aa');
+            grad.addColorStop(1, 'transparent');
+            ctx.strokeStyle = grad;
+            ctx.lineWidth   = baseR * 1.8;
+            ctx.lineCap     = 'round';
+            ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(tx, ty); ctx.stroke();
+            ctx.lineCap = 'butt';
+        }
+        // Rail driver: long hyper-velocity streak
+        if (pt === 'bgm_rail') {
+            const tx = x - Math.cos(pj.a) * 50;
+            const ty = y - Math.sin(pj.a) * 50;
+            const grad = ctx.createLinearGradient(x, y, tx, ty);
+            grad.addColorStop(0, '#fbbf24ee');
+            grad.addColorStop(1, 'transparent');
+            ctx.strokeStyle = grad;
+            ctx.lineWidth   = 4;
+            ctx.lineCap     = 'round';
+            ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(tx, ty); ctx.stroke();
+            ctx.lineCap = 'butt';
+        }
+        // EPA citadel: gold streak
+        if (pt === 'epa_citadel') {
+            const tx = x - Math.cos(pj.a) * 28;
+            const ty = y - Math.sin(pj.a) * 28;
+            const grad = ctx.createLinearGradient(x, y, tx, ty);
+            grad.addColorStop(0, '#fde68acc');
+            grad.addColorStop(1, 'transparent');
+            ctx.strokeStyle = grad;
+            ctx.lineWidth   = 3;
+            ctx.lineCap     = 'round';
+            ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(tx, ty); ctx.stroke();
+            ctx.lineCap = 'butt';
+        }
+    }  // end for loop
+}  // end drawProjectiles
+
+// ── Players ────────────────────────────────────────────────────────────────────
+function drawPlayers() {
+    if (myId && myState.rt <= 0) {
+        drawPlayer({ x: myState.x, y: myState.y, a: myState.a, team: myState.team, hp: myState.hp, maxHp: myState.maxHp, isSelf: true, burning: myState.burnUntil > performance.now(), bubbleId: myId });
+    }
+    for (const p of getInterpolatedPlayers()) {
+        drawPlayer({ x: p.x, y: p.y, team: p.tm, hp: p.hp, maxHp: 100, name: p.nm, a: p.a, isSelf: false, bubbleId: p.i });
+    }
+}
+
+function drawPlayer({ x, y, team, hp, maxHp, name, a = 0, isSelf, burning = false, bubbleId = null }) {
+    const camRot = getCamRotation();
+    const isRed  = team === 0;
+    const col    = isRed ? '#ef4444' : '#3b82f6';
+    const colDk  = isRed ? '#7f1d1d' : '#1e3a8a';
+    const colMd  = isRed ? '#b91c1c' : '#1e40af';
+    const colLt  = isRed ? '#fca5a5' : '#93c5fd';
+
+    ctx.save();
+    ctx.translate(x, y);
+
+    // Ground shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.beginPath(); ctx.ellipse(2, 3, 17, 13, 0, 0, Math.PI*2); ctx.fill();
+
+    // ── Self indicator ring ────────────────────────────────────────────────────
+    if (isSelf) {
+        ctx.shadowColor = '#f59e0b'; ctx.shadowBlur = 14;
+        ctx.beginPath(); ctx.arc(0, 0, 21, 0, Math.PI*2);
+        ctx.strokeStyle = 'rgba(245,158,11,0.85)'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.shadowBlur = 0;
+    }
+
+    // ── Burn DoT visual — orange flickering aura ───────────────────────────────
+    if (burning) {
+        const flicker = Math.sin(performance.now() / 80) * 0.35 + 0.65;
+        ctx.beginPath(); ctx.arc(0, 0, 24, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(249,115,22,${0.18 * flicker})`;
+        ctx.fill();
+        ctx.beginPath(); ctx.arc(0, 0, 24, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(239,68,68,${0.7 * flicker})`;
+        ctx.lineWidth = 2.5;
+        ctx.shadowColor = '#f97316'; ctx.shadowBlur = 16;
+        ctx.stroke(); ctx.shadowBlur = 0;
+    }
+
+    // ── Full body rotates toward aim direction ─────────────────────────────────
+    ctx.save();
+    ctx.rotate(a);
+
+    // Boots / feet (back-left and back-right of the soldier)
+    ctx.fillStyle = '#374151';
+    ctx.beginPath(); ctx.ellipse(-9, -7, 5, 3.5, 0.25, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-9,  7, 5, 3.5, -0.25, 0, Math.PI*2); ctx.fill();
+
+    // Leg lower halves
+    ctx.fillStyle = '#4b5563';
+    ctx.fillRect(-7, -6, 8, 4);
+    ctx.fillRect(-7,  2, 8, 4);
+
+    // Backpack / utility pack
+    ctx.fillStyle = '#2d3748';
+    ctx.fillRect(-14, -5, 7, 10);
+    ctx.fillStyle = '#374151';
+    ctx.fillRect(-13, -4, 5, 3);
+
+    // Torso armor (main body)
+    ctx.fillStyle = colDk;
+    ctx.beginPath(); ctx.ellipse(0, 0, 12, 9, 0, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.stroke();
+
+    // Chest plate highlight
+    ctx.fillStyle = colMd;
+    ctx.beginPath(); ctx.ellipse(-1, 0, 7, 5.5, 0, 0, Math.PI*2); ctx.fill();
+
+    // Chest stripe / insignia
+    ctx.fillStyle = col;
+    ctx.globalAlpha = 0.65;
+    ctx.fillRect(-3, -3, 6, 6);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = colLt;
+    ctx.globalAlpha = 0.3;
+    ctx.fillRect(-2, -2, 4, 4);
+    ctx.globalAlpha = 1;
+
+    // Left arm shoulder pad
+    ctx.fillStyle = colDk;
+    ctx.beginPath(); ctx.ellipse(-2, -11, 4.5, 3.5, 0.3, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.stroke();
+
+    // Right arm shoulder pad
+    ctx.beginPath(); ctx.ellipse(-2, 11, 4.5, 3.5, -0.3, 0, Math.PI*2); ctx.fill();
+    ctx.stroke();
+
+    // ── Gun / weapon ────────────────────────────────────────────────────────────
+    // Gun body
+    ctx.fillStyle = '#1f2937';
+    ctx.fillRect(8, -4, 18, 8);     // receiver
+    ctx.fillStyle = '#374151';
+    ctx.fillRect(8, -3.5, 18, 3);   // top rail
+    // Muzzle
+    ctx.fillStyle = '#111827';
+    ctx.fillRect(25, -2.5, 8, 5);
+    // Muzzle highlight
+    ctx.fillStyle = '#6b7280';
+    ctx.fillRect(31, -1.5, 2, 3);
+    // Grip
+    ctx.fillStyle = '#2d3748';
+    ctx.fillRect(12, 4, 5, 6);
+    // Barrel under-rail
+    ctx.fillStyle = '#374151';
+    ctx.fillRect(15, 2, 12, 3);
+
+    // ── Helmet / head ───────────────────────────────────────────────────────────
+    ctx.fillStyle = '#1a2235';
+    ctx.beginPath(); ctx.arc(9, 0, 7, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.stroke();
+
+    // Visor (glows team color)
+    ctx.fillStyle = col;
+    ctx.globalAlpha = 0.75;
+    ctx.beginPath(); ctx.ellipse(11, 0, 4, 2.5, 0, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+    // Visor glare
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.beginPath(); ctx.ellipse(10.5, -0.8, 1.5, 0.8, -0.3, 0, Math.PI*2); ctx.fill();
+
+    // Helmet ridge
+    ctx.strokeStyle = '#2d3f55'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(9, 0, 7, -Math.PI*0.7, Math.PI*0.7); ctx.stroke();
+
+    ctx.restore(); // end body rotation
+
+    // ── Labels — always upright on screen (counter-rotated) ───────────────────
+    ctx.save();
+    ctx.rotate(-camRot);
+
+    // ── Chat bubble ────────────────────────────────────────────────────────────
+    const bubble = chatBubbles.get(bubbleId);
+    if (bubble && performance.now() < bubble.expireAt) {
+        const age      = performance.now() - (bubble.expireAt - 4500);
+        const fadeIn   = Math.min(1, age / 180);
+        const fadeOut  = bubble.expireAt - performance.now() < 600
+                         ? (bubble.expireAt - performance.now()) / 600 : 1;
+        const alpha    = fadeIn * fadeOut;
+
+        const BFONT    = 'bold 15px "Barlow", sans-serif';
+        ctx.font       = BFONT;
+
+        // Word-wrap to max 220px wide (wider to fit bigger text)
+        const words    = bubble.msg.split(' ');
+        const lines    = [];
+        let cur        = '';
+        for (const w of words) {
+            const test = cur ? cur + ' ' + w : w;
+            if (ctx.measureText(test).width > 220 && cur) { lines.push(cur); cur = w; }
+            else cur = test;
+        }
+        if (cur) lines.push(cur);
+
+        const lh       = 19;
+        const pad      = 9;
+        const bw       = Math.max(...lines.map(l => ctx.measureText(l).width)) + pad * 2;
+        const bh       = lines.length * lh + pad * 1.5;
+
+        // Bubble position: above name tag
+        const byBase   = name ? -64 : -50;
+        const by       = byBase - bh;
+        const bx       = -bw / 2;
+
+        // Tail triangle
+        const tailH    = 7;
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle  = 'rgba(14,20,40,0.94)';
+        ctx.beginPath();
+        ctx.moveTo(-6, byBase - 1);
+        ctx.lineTo( 6, byBase - 1);
+        ctx.lineTo( 0, byBase + tailH);
+        ctx.closePath(); ctx.fill();
+
+        // Bubble box
+        const bRadius  = 8;
+        ctx.beginPath();
+        ctx.roundRect(bx, by, bw, bh, bRadius);
+        ctx.fillStyle  = 'rgba(14,20,40,0.94)';
+        ctx.fill();
+        ctx.strokeStyle = team === 0 ? 'rgba(239,68,68,0.55)' : 'rgba(59,130,246,0.55)';
+        ctx.lineWidth  = 1.2;
+        ctx.stroke();
+
+        // Bubble text
+        ctx.fillStyle  = 'rgba(255,255,255,0.92)';
+        ctx.textAlign  = 'center';
+        ctx.font       = BFONT;
+        for (let i = 0; i < lines.length; i++) {
+            ctx.fillText(lines[i], 0, by + pad + (i + 0.8) * lh);
+        }
+        ctx.globalAlpha = 1;
+    } else if (bubble && performance.now() >= bubble.expireAt) {
+        chatBubbles.delete(bubbleId);
+    }
+
+    if (name) {
+        ctx.font = 'bold 16px "Barlow Condensed", sans-serif';
+        ctx.textAlign = 'center';
+        const tw = ctx.measureText(name).width;
+        ctx.fillStyle = 'rgba(6,9,20,0.8)';
+        ctx.fillRect(-tw/2 - 6, -43, tw + 12, 17);
+        ctx.fillStyle = colLt;
+        ctx.fillText(name, 0, -30);
+    }
+
+    // Health bar — only visible when damaged
+    const hpF = Math.max(0, hp / maxHp);
+    if (hpF < 1) {
+        const bW = 40, bY = name ? -60 : -40;
+        ctx.fillStyle = 'rgba(0,0,0,0.65)';
+        ctx.fillRect(-bW/2, bY, bW, 6);
+        ctx.fillStyle = hpF > 0.5 ? '#22c55e' : hpF > 0.25 ? '#f59e0b' : '#ef4444';
+        ctx.fillRect(-bW/2, bY, bW * hpF, 6);
+        ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.5;
+        ctx.strokeRect(-bW/2, bY, bW, 6);
+    }
+
+    ctx.restore();
+    ctx.restore();
+}
+
+// ── Build ghost ────────────────────────────────────────────────────────────────
+function drawBuildGhost() {
+    if (!currentBuild || currentPhase !== 1) return;
+
+    // Snap to grid
+    const gx = snapToGrid(mouse.wx);
+    const gy = snapToGrid(mouse.wy);
+
+    const cost      = currentBuild === 'w' ? 10 : 30;
+    const mid       = mapData.mw / 2;
+    const onOwnSide = currentPhase === 2 || (myState.team === 0 ? gx < mid - 50 : gx > mid + 50);
+    const coreDist  = Math.hypot(gx - coreData[myState.team]?.x, gy - coreData[myState.team]?.y);
+    const noOverlap = canPlaceBuilding(currentBuild, gx, gy);
+    const onWater   = isOnWater(gx, gy, 25);
+    const canBuild  = myState.res >= cost && onOwnSide && coreDist >= 150 && noOverlap && !onWater;
+
+    const camRot   = getCamRotation();
+    const ghostCol = canBuild ? '#22c55e' : '#ef4444';
+    const hw       = GRID_SIZE / 2;
+
+    ctx.save();
+    ctx.translate(gx, gy);
+
+    ctx.globalAlpha = 0.55;
+    ctx.shadowColor = ghostCol;
+    ctx.shadowBlur  = 18;
+    ctx.strokeStyle = ghostCol;
+    ctx.lineWidth   = 2;
+
+    if (currentBuild === 'w') {
+        ctx.fillStyle = ghostCol + '30';
+        ctx.fillRect(-hw, -hw, GRID_SIZE, GRID_SIZE);
+        ctx.strokeRect(-hw, -hw, GRID_SIZE, GRID_SIZE);
+        // Grid snap cross-hair
+        ctx.globalAlpha = 0.3;
+        ctx.beginPath(); ctx.moveTo(-hw, 0); ctx.lineTo(hw, 0); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, -hw); ctx.lineTo(0, hw); ctx.stroke();
+        ctx.globalAlpha = 0.55;
+    } else {
+        ctx.fillStyle = ghostCol + '30';
+        ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI*2);
+        ctx.fill(); ctx.stroke();
+        // Barrel indicator
+        ctx.globalAlpha = 0.35;
+        ctx.fillStyle = ghostCol;
+        ctx.fillRect(10, -3, 18, 6);
+        ctx.globalAlpha = 0.55;
+    }
+
+    ctx.shadowBlur  = 0;
+    ctx.globalAlpha = 1;
+
+    // Cost label — always readable (counter-rotated)
+    ctx.save();
+    ctx.rotate(-camRot);
+    ctx.font = 'bold 15px "Barlow Condensed", sans-serif';
+    ctx.textAlign = 'center';
+    const label = (canBuild ? '' : '✗ ') + cost + ' scrap';
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(-28, -hw - 20, 56, 14);
+    ctx.fillStyle = canBuild ? '#22c55e' : '#ef4444';
+    ctx.fillText(label, 0, -hw - 9);
+    ctx.restore();
+
+    ctx.restore();
+}
+</script>
+</body>
+</html>
