@@ -159,7 +159,7 @@
             justify-content: flex-start;
             align-items: flex-end;
             gap: 8px;
-            padding-left: 122px; /* clear the sidebar (~110px wide + 12px gap) */
+            padding-left: 12px; /* clear the sidebar (~110px wide + 12px gap) */
         }
         .bfill { transition: width 0.28s ease; }
 
@@ -689,7 +689,7 @@
         <!-- Eyebrow line -->
         <div style="display:flex;align-items:center;gap:18px;margin-bottom:36px;">
             <div style="width:100px;height:1px;background:linear-gradient(to left,rgba(220,38,38,0.55),transparent);"></div>
-            <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:6px;color:rgba(255,255,255,0.18);text-transform:uppercase;">2v2 Core Siege</div>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:6px;color:rgba(255,255,255,0.18);text-transform:uppercase;">Team v Team Core Siege</div>
             <div style="width:100px;height:1px;background:linear-gradient(to right,rgba(37,99,235,0.55),transparent);"></div>
         </div>
 
@@ -1387,7 +1387,7 @@ const FACTIONS = {
         name: 'Revolutionaries of Earth', short: 'ROE',
         wallCost: 8, turretCost: 25, hasUpgrades: true, baseTurret: 't', baseWall: 'w',
         color: '#f59e0b',
-        desc: 'Jack of all trades. Cheap defenses, full upgrade tree. No clear weakness — no clear strength.',
+        desc: 'Jack of all trades. Cheap defenses, full upgrade tree. No clear weakness, no clear strength.',
     },
     'bgm': {
         name: 'BlackenedGods Mining Corp', short: 'B.G.M. Corp',
@@ -4247,7 +4247,7 @@ function drawPlayer({ x, y, team, hp, maxHp, name, a = 0, isSelf, burning = fals
 
 // ── Build ghost ────────────────────────────────────────────────────────────────
 function drawBuildGhost() {
-    if (!currentBuild || currentPhase !== 1) return;
+    if (!currentBuild || (currentPhase !== 1 && currentPhase !== 2)) return;
 
     // Snap to grid
     const gx = snapToGrid(mouse.wx);
