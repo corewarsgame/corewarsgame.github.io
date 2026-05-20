@@ -231,31 +231,232 @@
 
         /* ── MATCHMAKING SCREEN ── */
         #matchmakeScreen {
-            background: rgba(10,14,26,0.7);
-            backdrop-filter: blur(4px);
+            background: #0a0e1a;
+            background-image:
+                radial-gradient(ellipse 70% 60% at 15% 50%, rgba(127,29,29,0.18) 0%, transparent 60%),
+                radial-gradient(ellipse 70% 60% at 85% 50%, rgba(29,78,216,0.18) 0%, transparent 60%),
+                radial-gradient(circle, rgba(255,255,255,0.025) 1px, transparent 1px);
+            background-size: auto, auto, 32px 32px;
+            align-items: stretch;
+            justify-content: stretch;
+            flex-direction: column;
+        }
+        #matchmakeScreen::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to bottom, transparent 50%, rgba(255,255,255,0.012) 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            opacity: 0.5;
+        }
+
+        /* Top bar */
+        #mmTopBar {
+            position: relative; z-index: 2;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 32px;
+            height: 58px;
+            background: rgba(6,9,20,0.7);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            backdrop-filter: blur(10px);
+            flex-shrink: 0;
+        }
+        #mmWordmark {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 26px; letter-spacing: 5px; color: white;
+            display: flex; align-items: center; gap: 10px;
+        }
+        #mmWordmark span { color: #ef4444; }
+        #mmPlayerInfo {
+            display: flex; align-items: center; gap: 10px;
+        }
+        #mmNamePill {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 5px 14px;
+            display: flex; align-items: center; gap: 8px;
+            cursor: pointer; transition: background 0.18s;
+        }
+        #mmNamePill:hover { background: rgba(255,255,255,0.1); }
+        #mmNamePill input {
+            background: transparent; border: none; outline: none;
+            color: white;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 16px; font-weight: 700; letter-spacing: 1px;
+            width: 110px;
+            cursor: pointer;
+        }
+        #mmNamePill input:focus { cursor: text; }
+        #mmNameLabel {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 11px; font-weight: 700; letter-spacing: 3px;
+            color: rgba(255,255,255,0.3); text-transform: uppercase;
+        }
+        #mmRankPill {
+            border-radius: 8px;
+            padding: 5px 14px 5px 10px;
+            display: flex; align-items: center; gap: 8px;
+            border: 1px solid transparent;
+            font-family: 'Barlow Condensed', sans-serif;
+        }
+        #mmRankIcon { font-size: 16px; }
+        #mmRankName {
+            font-size: 15px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+        }
+        #mmRankPts {
+            font-size: 12px; color: rgba(255,255,255,0.35); letter-spacing: 1px;
+        }
+
+        /* Main content area */
+        #mmContent {
+            flex: 1;
+            display: flex;
+            position: relative; z-index: 1;
+            overflow: hidden;
+        }
+
+        /* Left hero panel */
+        #mmHero {
+            flex: 0 0 42%;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: flex-start;
+            padding: 0 0 0 clamp(32px, 5vw, 80px);
+            gap: 0;
+        }
+        #mmHeroEyebrow {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 13px; font-weight: 700; letter-spacing: 6px;
+            color: rgba(255,255,255,0.18); text-transform: uppercase;
+            margin-bottom: 18px;
+        }
+        #mmHeroTitle {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: clamp(72px,10vw,128px);
+            color: white; line-height: 0.86; letter-spacing: 8px;
+            text-shadow: 0 0 100px rgba(220,38,38,0.3), 0 0 160px rgba(37,99,235,0.2);
+        }
+        #mmHeroBar {
+            display: flex; height: 3px; width: min(340px, 60%);
+            border-radius: 2px; overflow: hidden; margin: 22px 0;
+        }
+        #mmHeroTagline {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 14px; color: rgba(255,255,255,0.18);
+            letter-spacing: 6px; font-weight: 700; text-transform: uppercase;
+        }
+        .mm-stat-row {
+            display: flex; gap: 28px; margin-top: 40px;
+        }
+        .mm-stat { display: flex; flex-direction: column; gap: 4px; }
+        .mm-stat-val {
+            font-family: 'Bebas Neue', sans-serif; font-size: 28px; color: white; letter-spacing: 2px;
+        }
+        .mm-stat-lbl {
+            font-family: 'Barlow Condensed', sans-serif; font-size: 11px; font-weight: 700;
+            letter-spacing: 3px; color: rgba(255,255,255,0.22); text-transform: uppercase;
+        }
+
+        /* Right form panel */
+        #mmForm {
+            flex: 1;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            padding: 0 clamp(24px, 4vw, 60px);
+        }
+        #mmFormCard {
+            width: 100%; max-width: 460px;
+            background: rgba(10,15,30,0.75);
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 20px;
+            padding: 32px 30px 28px;
+            box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+            backdrop-filter: blur(20px);
+        }
+        #mmFormTitle {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 14px; letter-spacing: 5px; color: rgba(255,255,255,0.28);
+            text-transform: uppercase; margin-bottom: 16px;
+        }
+
+        /* Mode cards */
+        #mmModes {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 9px; margin-bottom: 20px;
+        }
+        .mm-mode-card {
+            background: rgba(255,255,255,0.03);
+            border: 1.5px solid rgba(255,255,255,0.07);
+            border-radius: 12px;
+            padding: 12px 14px;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s, transform 0.1s;
+            display: flex; flex-direction: column; gap: 3px;
+            user-select: none;
+        }
+        .mm-mode-card:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); }
+        .mm-mode-card:active { transform: scale(0.98); }
+        .mm-mode-card.selected {
+            background: rgba(251,191,36,0.06);
+            border-color: rgba(251,191,36,0.4);
+        }
+        .mm-mode-icon {
+            font-size: 18px; margin-bottom: 2px;
+        }
+        .mm-mode-name {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 17px; letter-spacing: 2px; color: white;
+        }
+        .mm-mode-desc {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 12px; font-weight: 600; letter-spacing: 1px;
+            color: rgba(255,255,255,0.3);
+        }
+        .mm-mode-card.selected .mm-mode-name { color: #fbbf24; }
+        .mm-mode-card.selected .mm-mode-icon { filter: brightness(1.3); }
+
+        /* Room code row */
+        #mmCodeRow { margin-bottom: 16px; }
+        #mmCodeLabel {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 12px; font-weight: 700; letter-spacing: 3px;
+            color: rgba(255,255,255,0.28); text-transform: uppercase; margin-bottom: 6px;
+        }
+        #rCode {
+            width: 100%;
         }
 
         #btnJoin {
-            width: 100%; padding: 14px;
+            width: 100%; padding: 15px;
             background: linear-gradient(125deg, #dc2626 0%, #7c3aed 50%, #2563eb 100%);
             color: white; border: none; border-radius: 10px; cursor: pointer;
             font-family: 'Bebas Neue', sans-serif;
-            font-size: 30px; letter-spacing: 3px;
-            box-shadow: 0 4px 22px rgba(0,0,0,0.18);
+            font-size: 30px; letter-spacing: 4px;
+            box-shadow: 0 4px 28px rgba(0,0,0,0.28);
             transition: opacity 0.2s, transform 0.12s;
+            margin-bottom: 10px;
         }
         #btnJoin:hover  { opacity: 0.88; }
         #btnJoin:active { transform: scale(0.98); }
 
+        #connStatus {
+            text-align: center;
+            font-family: 'Barlow', sans-serif;
+            font-size: 15px; min-height: 20px;
+            color: rgba(255,255,255,0.35);
+            margin-bottom: 6px;
+        }
+
         #btnBack {
             background: none; border: none; cursor: pointer;
             font-family: 'Barlow Condensed', sans-serif;
-            font-size: 18px; font-weight: 700; letter-spacing: 2px;
-            color: rgba(255,255,255,0.3); text-transform: uppercase;
-            padding: 6px 0;
+            font-size: 16px; font-weight: 700; letter-spacing: 2px;
+            color: rgba(255,255,255,0.22); text-transform: uppercase;
+            padding: 4px 0; width: 100%; text-align: center;
             transition: color 0.2s;
         }
-        #btnBack:hover { color: rgba(255,255,255,0.75); }
+        #btnBack:hover { color: rgba(255,255,255,0.65); }
 
         /* ── LOBBY SCREEN ── */
         #lobbyScreen {
@@ -725,27 +926,88 @@
 
 <!-- ══════════════════ MATCHMAKING SCREEN ══════════════════ -->
 <div id="matchmakeScreen" class="screen hidden">
-    <div class="glass-dark fade-in" style="width:100%;max-width:360px;border-radius:16px;padding:32px 28px 24px;box-shadow:0 24px 80px rgba(0,0,0,0.5),inset 0 0 0 1px rgba(255,255,255,0.07);">
 
-        <!-- Header -->
-        <div style="text-align:center;margin-bottom:28px;">
-            <div style="font-family:'Bebas Neue',sans-serif;font-size:57px;color:white;letter-spacing:5px;line-height:1;">FIND MATCH</div>
-            <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;color:rgba(255,255,255,0.22);letter-spacing:5px;font-weight:700;text-transform:uppercase;margin-top:4px;">Enter the arena</div>
+    <!-- Top bar -->
+    <div id="mmTopBar" class="ia">
+        <div id="mmWordmark">⚡ <span>CORE</span>&nbsp;WARS</div>
+        <div id="mmPlayerInfo">
+            <div id="mmRankPill">
+                <span id="mmRankIcon">⬡</span>
+                <span id="mmRankName">IRON V</span>
+                <span id="mmRankPts">0 RP</span>
+            </div>
+            <div id="mmNamePill">
+                <span id="mmNameLabel">PILOT</span>
+                <input id="pName" maxlength="18" autocomplete="off" spellcheck="false" value="Pilot"/>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main content -->
+    <div id="mmContent">
+
+        <!-- Left: hero branding -->
+        <div id="mmHero">
+            <div id="mmHeroEyebrow">Team v Team Core Siege</div>
+            <div id="mmHeroTitle">CORE<br>WARS</div>
+            <div id="mmHeroBar">
+                <div style="flex:1;background:linear-gradient(to right,#7f1d1d,#ef4444);"></div>
+                <div style="flex:1;background:linear-gradient(to right,#3b82f6,#1e3a8a);"></div>
+            </div>
+            <div id="mmHeroTagline">Build · Defend · Destroy</div>
+            <div class="mm-stat-row">
+                <div class="mm-stat">
+                    <div class="mm-stat-val" id="mmWins">0</div>
+                    <div class="mm-stat-lbl">Wins</div>
+                </div>
+                <div class="mm-stat">
+                    <div class="mm-stat-val" id="mmLosses">0</div>
+                    <div class="mm-stat-lbl">Losses</div>
+                </div>
+                <div class="mm-stat">
+                    <div class="mm-stat-val" id="mmGames">0</div>
+                    <div class="mm-stat-lbl">Games</div>
+                </div>
+            </div>
         </div>
 
-        <!-- Form -->
-        <div style="display:flex;flex-direction:column;gap:14px;">
-            <div>
-                <label class="lbl-dark" for="pName">Player Name</label>
-                <input id="pName" class="field-dark ia" value="Pilot"/>
+        <!-- Right: form -->
+        <div id="mmForm" class="ia">
+            <div id="mmFormCard">
+                <div id="mmFormTitle">Select Game Mode</div>
+
+                <div id="mmModes">
+                    <div class="mm-mode-card ia selected" data-mode="ranked1v1">
+                        <div class="mm-mode-icon">&#127942;</div>
+                        <div class="mm-mode-name">Ranked 1v1</div>
+                        <div class="mm-mode-desc">1v1 · Affects rank</div>
+                    </div>
+                    <div class="mm-mode-card ia" data-mode="ranked2v2">
+                        <div class="mm-mode-icon">&#9876;</div>
+                        <div class="mm-mode-name">Ranked 2v2</div>
+                        <div class="mm-mode-desc">2v2 · Affects rank</div>
+                    </div>
+                    <div class="mm-mode-card ia" data-mode="casual">
+                        <div class="mm-mode-icon">&#127918;</div>
+                        <div class="mm-mode-name">Casual</div>
+                        <div class="mm-mode-desc">Up to 4v4 · No rank</div>
+                    </div>
+                    <div class="mm-mode-card ia" data-mode="private">
+                        <div class="mm-mode-icon">&#128274;</div>
+                        <div class="mm-mode-name">Private</div>
+                        <div class="mm-mode-desc">Room code only</div>
+                    </div>
+                </div>
+
+                <div id="mmCodeRow">
+                    <div id="mmCodeLabel">Room Code <span id="mmCodeOptional" style="color:rgba(255,255,255,0.18);font-weight:600;">(optional)</span></div>
+                    <input id="rCode" class="field-dark ia" placeholder="Leave blank to auto-match" autocomplete="off"/>
+                </div>
+
+                <button id="btnJoin" class="ia">&#9654; &nbsp; DEPLOY</button>
+                <p id="connStatus"></p>
+                <button id="btnBack" class="ia">&#8592; Back</button>
             </div>
-            <div>
-                <label class="lbl-dark" for="rCode">Room Code <span style="font-size:14px;color:rgba(255,255,255,0.18);font-weight:600;">(optional)</span></label>
-                <input id="rCode" class="field-dark ia" placeholder="Leave blank for Auto-Match"/>
-            </div>
-            <button id="btnJoin" class="ia" style="margin-top:4px;">Deploy / Find Match</button>
-            <p id="connStatus" style="text-align:center;font-family:'Barlow',sans-serif;font-size:18px;min-height:18px;"></p>
-            <button id="btnBack" class="ia">← Back</button>
         </div>
     </div>
 </div>
@@ -1044,6 +1306,61 @@ function showScreen(name) {
 // Server compresses angle to uint8 (0-255); decode back to radians here.
 function decodeAngle(b) {
     return (b / 256) * Math.PI * 2 - Math.PI;
+}
+
+// ─── Player profile (localStorage-backed) ─────────────────────────────────────
+function getRankInfo(rank) {
+    const tiers = [
+        { name: 'IRON',     min: 0,  color: '#94a3b8', bg: 'rgba(148,163,184,0.08)' },
+        { name: 'BRONZE',   min: 5,  color: '#cd7f32', bg: 'rgba(205,127,50,0.1)'   },
+        { name: 'SILVER',   min: 10, color: '#c0c0c0', bg: 'rgba(192,192,192,0.1)'  },
+        { name: 'GOLD',     min: 15, color: '#fbbf24', bg: 'rgba(251,191,36,0.1)'   },
+        { name: 'PLATINUM', min: 20, color: '#22d3ee', bg: 'rgba(34,211,238,0.1)'   },
+        { name: 'DIAMOND',  min: 25, color: '#818cf8', bg: 'rgba(129,140,248,0.1)'  },
+        { name: 'LEGEND',   min: 30, color: '#f43f5e', bg: 'rgba(244,63,94,0.1)'    },
+    ];
+    let tier = tiers[0];
+    for (const t of tiers) { if (rank >= t.min) tier = t; }
+    const divs = ['V','IV','III','II','I'];
+    const div  = rank >= 30 ? '' : ' ' + divs[rank % 5];
+    return { ...tier, display: tier.name + div };
+}
+
+let playerRank   = parseInt(localStorage.getItem('cw_rank')   || '0', 10);
+let playerWins   = parseInt(localStorage.getItem('cw_wins')   || '0', 10);
+let playerLosses = parseInt(localStorage.getItem('cw_losses') || '0', 10);
+let playerGames  = parseInt(localStorage.getItem('cw_games')  || '0', 10);
+let currentGameMode = 'ranked1v1';   // tracks which mode the player queued for
+
+function saveProfile() {
+    localStorage.setItem('cw_rank',   playerRank);
+    localStorage.setItem('cw_wins',   playerWins);
+    localStorage.setItem('cw_losses', playerLosses);
+    localStorage.setItem('cw_games',  playerGames);
+    if (document.getElementById('pName'))
+        localStorage.setItem('cw_name', document.getElementById('pName').value);
+}
+
+function refreshRankUI() {
+    const info = getRankInfo(playerRank);
+    const pill = document.getElementById('mmRankPill');
+    if (!pill) return;
+    pill.style.background   = info.bg;
+    pill.style.borderColor  = info.color + '55';
+    document.getElementById('mmRankName').textContent = info.display;
+    document.getElementById('mmRankName').style.color = info.color;
+    document.getElementById('mmRankPts').textContent  = `${playerRank} RP`;
+    const icon = document.getElementById('mmRankIcon');
+    const icons = { IRON:'⬡', BRONZE:'⬡', SILVER:'◈', GOLD:'◆', PLATINUM:'◉', DIAMOND:'◈', LEGEND:'★' };
+    icon.textContent  = icons[info.name] || '⬡';
+    icon.style.color  = info.color;
+    // stats
+    const mw = document.getElementById('mmWins');
+    const ml = document.getElementById('mmLosses');
+    const mg = document.getElementById('mmGames');
+    if (mw) mw.textContent = playerWins;
+    if (ml) ml.textContent = playerLosses;
+    if (mg) mg.textContent = playerGames;
 }
 
 // ─── Game world state ─────────────────────────────────────────────────────────
@@ -1555,12 +1872,41 @@ resize();
 let ws;
 
 document.getElementById('btnPlay').addEventListener('click', () => {
+    // Restore saved name
+    const savedName = localStorage.getItem('cw_name');
+    if (savedName) document.getElementById('pName').value = savedName;
+    refreshRankUI();
     showScreen('matchmake');
 });
 
 document.getElementById('btnBack').addEventListener('click', () => {
     if (ws) { ws.close(); ws = null; }
     showScreen('start');
+});
+
+// Mode card selection
+document.querySelectorAll('.mm-mode-card').forEach(card => {
+    card.addEventListener('click', () => {
+        document.querySelectorAll('.mm-mode-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        currentGameMode = card.dataset.mode;
+        const codeOpt = document.getElementById('mmCodeOptional');
+        const rCode   = document.getElementById('rCode');
+        if (currentGameMode === 'private') {
+            codeOpt.textContent = '(required)';
+            codeOpt.style.color = '#fbbf24';
+            rCode.placeholder   = 'Enter room code';
+        } else {
+            codeOpt.textContent = '(optional)';
+            codeOpt.style.color = 'rgba(255,255,255,0.18)';
+            rCode.placeholder   = 'Leave blank to auto-match';
+        }
+    });
+});
+
+// Save name to localStorage on change
+document.getElementById('pName').addEventListener('input', () => {
+    localStorage.setItem('cw_name', document.getElementById('pName').value);
 });
 
 document.getElementById('chatSendBtn').addEventListener('click', sendChat);
@@ -1576,16 +1922,24 @@ document.getElementById('gameChatInput').addEventListener('keydown', e => {
 });
 
 document.getElementById('btnJoin').addEventListener('click', () => {
+    const rCodeVal = document.getElementById('rCode').value.trim();
+    if (currentGameMode === 'private' && !rCodeVal) {
+        setStatus('Enter a room code for Private mode.', 'red');
+        return;
+    }
     const addr = 'https://core-wars-backend.onrender.com';
-    myState.name = document.getElementById('pName').value || 'Pilot';
+    myState.name = document.getElementById('pName').value.trim() || 'Pilot';
+    saveProfile();
     setStatus('Connecting…', 'yellow');
     try { ws = new WebSocket(addr); } catch { setStatus('Invalid URL.', 'red'); return; }
 
     ws.onopen = () => {
         ws.send(JSON.stringify({
-            t: 'join',
-            n: myState.name,
-            r: document.getElementById('rCode').value || null,
+            t   : 'join',
+            n   : myState.name,
+            r   : rCodeVal || null,
+            mode: currentGameMode,
+            rank: playerRank,
         }));
         setStatus('Waiting for server…', 'yellow');
     };
@@ -2525,6 +2879,18 @@ function showGameOver(winner) {
     $gameOver.style.background = winner === 0
         ? 'linear-gradient(145deg, #7f1d1d, #b91c1c)'
         : 'linear-gradient(145deg, #1e3a8a, #1d4ed8)';
+
+    // Update rank / stats for ranked modes
+    const isRanked = currentGameMode === 'ranked1v1' || currentGameMode === 'ranked2v2';
+    playerGames++;
+    if (myState.team === winner) {
+        playerWins++;
+        if (isRanked) playerRank++;
+    } else {
+        playerLosses++;
+        if (isRanked) playerRank = Math.max(0, playerRank - 1);
+    }
+    saveProfile();
 }
 
 // ─── Geometry helpers ─────────────────────────────────────────────────────────
