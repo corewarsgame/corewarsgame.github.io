@@ -1351,7 +1351,7 @@ function refreshRankUI() {
     document.getElementById('mmRankName').style.color = info.color;
     document.getElementById('mmRankPts').textContent  = `${playerRank} RP`;
     const icon = document.getElementById('mmRankIcon');
-    const icons = { IRON:'⬡', BRONZE:'⬡', SILVER:'◈', GOLD:'◆', PLATINUM:'◉', DIAMOND:'◈', LEGEND:'★' };
+    const icons = { IRON:'⬡', BRONZE:'⬡', SILVER:'◈', GOLD:'◆', PLATINUM:'◉', DIAMOND:'', LEGEND:'★' };
     icon.textContent  = icons[info.name] || '⬡';
     icon.style.color  = info.color;
     // stats
@@ -2859,10 +2859,6 @@ function updateUI() {
             if (currentBuild) selectBuild(null);
         }
 
-        // Refresh upgrade panel affordability whenever scrap updates
-        if (selectedTurret) updateUpgradePanel();
-        if (selectedWall)   updateWallUpgradePanel();
-
         if (myState.rt > 0) {
             $respawn.classList.remove('hidden');
             $respawnSec.innerText = Math.ceil(myState.rt);
@@ -2912,6 +2908,10 @@ function isOnWater(x, y, r = 0) {
 // Returns true if placing building type bt at (gx,gy) would overlap an existing building.
 const TURRET_PLACE_R = 24; // visual outer radius used for placement collision
 function canPlaceBuilding(bt, gx, gy) {
+    // Must build on own side (mirrors server check)
+    const mid = mapData.mw / 2;
+    if (myState.team === 0 && gx >= mid - 50) return false;
+    if (myState.team === 1 && gx <= mid + 50) return false;
     for (const b of localBuildings.values()) {
         if (bt === 'w') {
             // Placing a wall (50×50 collision box)
