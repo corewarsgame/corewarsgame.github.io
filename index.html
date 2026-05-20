@@ -1531,8 +1531,8 @@ let   lastInputAt   = 0;
 const cam = { x: 1500, y: 700 };
 const CAM_ZOOM  = 0.52;   // zoom out to show more of the larger map
 const GRID_SIZE     = 16;     // building snap grid
-const WALL_W        = 50;     // wall collision box width/height (matches server)
-const WALL_HALF     = 25;     // WALL_W / 2
+const WALL_W        = GRID_SIZE;      // wall collision box width/height (matches server & visual)
+const WALL_HALF     = GRID_SIZE / 2;  // WALL_W / 2
 const TURRET_COLL_R = 18;     // turret collision radius (matches server)
 
 // Returns canvas rotation so the enemy core is always at the top of the screen.
@@ -1896,7 +1896,10 @@ function processEvents(evs) {
         switch (ev.e) {
             case EV.PHASE_CHANGE:
                 currentPhase = ev.ph;
-                if (currentBuild) selectBuild(null);
+                // Only deselect build tool when leaving a building phase entirely (lobby/gameover).
+                // Transitioning from BUILD → ATTACK should keep the player's selection so they
+                // can continue placing during the attack phase without re-clicking the button.
+                if (currentBuild && ev.ph !== 1 && ev.ph !== 2) selectBuild(null);
                 if (selectedTurret) { selectedTurret = null; hideUpgradePanel(); }
                 if (selectedWall)   { selectedWall   = null; hideWallUpgradePanel(); }
                 break;
@@ -2297,17 +2300,26 @@ canvas.addEventListener('mousedown', e => {
             }
             e.stopPropagation();
         } else {
-            // Check if clicking on a friendly turret or wall for upgrade
-            let hitTurret = null;
-            let hitWall   = null;
+            // Check if clicking on a friendly turret or wall for upgrade.
+            // Always pick the CLOSEST match so Map insertion order doesn't
+            // randomly decide which panel opens, and a wall can't be silently
+            // overridden by a turret that appears later in the iteration.
+            let hitTurret = null, minTurretDist = Infinity;
+            let hitWall   = null, minWallDist   = Infinity;
             const wHit = WALL_HALF + 4; // click padding for walls (matches collision box)
             for (const b of localBuildings.values()) {
                 if (b.tm !== myState.team) continue;
-                if (b.tp === 't' && Math.hypot(mouse.wx - b.x, mouse.wy - b.y) < (b.r || 20) + 10) {
-                    hitTurret = b; break;
-                }
-                if (b.tp === 'w' && Math.abs(mouse.wx - b.x) < wHit && Math.abs(mouse.wy - b.y) < wHit) {
-                    hitWall = b;
+                if (b.tp === 't') {
+                    const d = Math.hypot(mouse.wx - b.x, mouse.wy - b.y);
+                    if (d < (b.r || 20) + 10 && d < minTurretDist) {
+                        hitTurret = b; minTurretDist = d;
+                    }
+                } else if (b.tp === 'w') {
+                    const dx = Math.abs(mouse.wx - b.x), dy = Math.abs(mouse.wy - b.y);
+                    if (dx < wHit && dy < wHit) {
+                        const d = Math.hypot(dx, dy);
+                        if (d < minWallDist) { hitWall = b; minWallDist = d; }
+                    }
                 }
             }
             if (hitTurret) {
