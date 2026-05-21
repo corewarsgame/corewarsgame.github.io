@@ -1406,7 +1406,7 @@ function refreshRankUI() {
     document.getElementById('mmRankName').style.color = info.color;
     document.getElementById('mmRankPts').textContent  = `${playerRank} RP`;
     const icon = document.getElementById('mmRankIcon');
-    const icons = { IRON:'⬡', BRONZE:'⬡', SILVER:'◈', GOLD:'◆', PLATINUM:'◉', DIAMOND:'', LEGEND:'★' };
+    const icons = { IRON:'⬡', BRONZE:'⬡', SILVER:'◈', GOLD:'◆', PLATINUM:'◉', DIAMOND:'✦', LEGEND:'★' };
     icon.textContent  = icons[info.name] || '⬡';
     icon.style.color  = info.color;
     // stats
