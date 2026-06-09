@@ -1820,11 +1820,7 @@
             <button onclick="toggleNews()" style="background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.3);font-size:18px;line-height:1;padding:2px 4px;transition:color 0.15s;" onmouseover="this.style.color='white'" onmouseout="this.style.color='rgba(255,255,255,0.3)'">&#x2715;</button>
         </div>
         <div id="startNewsContent">
-            <div class="news-item"><div class="news-tag tag-update">v0.9.1</div><div class="news-title">Tunnel Rat Mech rework & intercept mechanic</div><div class="news-sub">Slash VFX, intercept lasers, overhauled vehicle depot placement.</div><div class="news-date">Today</div></div>
-            <div class="news-item"><div class="news-tag tag-event">Season 1</div><div class="news-title">Ranked Season 1 is live</div><div class="news-sub">Climb from Iron to Legend. RP rewards at season end.</div><div class="news-date">This week</div></div>
-            <div class="news-item"><div class="news-tag tag-fix">Hotfix</div><div class="news-title">Wall placement & water zone collision fixes</div><div class="news-sub">Buildings no longer clip into water or the centre divide.</div><div class="news-date">3 days ago</div></div>
-            <div class="news-item"><div class="news-tag tag-update">Balance</div><div class="news-title">ROE Breaker armor reduced · BGM turret rate up</div><div class="news-sub">Meta adjustments from Season 0 data.</div><div class="news-date">5 days ago</div></div>
-            <div class="news-item"><div class="news-tag tag-event">Community</div><div class="news-title">First 2v2 tournament — sign-ups open</div><div class="news-sub">8-team bracket, best-of-3.</div><div class="news-date">1 week ago</div></div>
+            <div class="news-item"><div class="news-tag tag-update">v1</div><div class="news-title">Core Wars is finally fully released</div><div class="news-sub">Everything. Vehicles, Operators, Units, Weapons, and Social system.</div><div class="news-date">Today</div></div>
         </div>
     </div>
 </div>
@@ -3701,7 +3697,7 @@ function renderMapThumb(mapName) {
             {x:1300,y:1950,w:2200,h:50}, {x:0,y:0,w:380,h:100}, {x:0,y:1950,w:380,h:50},
             {x:4420,y:0,w:380,h:100}, {x:4420,y:1950,w:380,h:50}, {x:2050,y:880,w:700,h:160},
         ],
-        'CHOKEPOINT'  : [
+        'CHOKEPOINTS'  : [
             {x:1500,y:0,w:1800,h:180}, {x:1500,y:700,w:1800,h:200},
             {x:1500,y:900,w:700,h:250}, {x:2600,y:900,w:700,h:250},
             {x:1500,y:1150,w:1800,h:230}, {x:1500,y:1900,w:1800,h:100},
@@ -3777,9 +3773,9 @@ function buildMapVoteCards() {
     el.innerHTML = '';
     const MAP_DESCS = {
         'WARZONE'     : 'Open land. No water.',
-        'ARCHIPELAGO' : '3 bridges, 2 islands.',
-        'CHOKEPOINT'  : '2 lanes + thin midline.',
-        'DELTA'       : '3 river channels, 4 paths.',
+        'ARCHIPELAGO' : '3 bridges, One big puddle.',
+        'CHOKEPOINTS'  : '2 lanes + no midline.',
+        'DELTA'       : '3 river channels, 2 paths.',
         'FRACTURE'    : '2 lakes, asymmetric routes.',
     };
     const totalVotes = Object.values(mapTally).reduce((a, b) => a + b, 0);
@@ -5231,7 +5227,7 @@ document.getElementById('btnJoin').addEventListener('click', () => {
         setStatus('Enter a room code for Private mode.', 'red');
         return;
     }
-    const addr = 'https://core-wars-backend.onrender.com';
+    const addr = 'https://test-core-wars-backend.onrender.com';
     myState.name = document.getElementById('pName').value.trim() || 'Pilot';
     saveProfile();
     setStatus('Connecting…', 'yellow');
