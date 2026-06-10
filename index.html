@@ -3071,6 +3071,7 @@ let myPincerDash = null;  // null | { sx, sy, ex, ey, t0, dur } — active dash 
 let myAbilityCooldownEnd = 0;    // performance.now() timestamp when cooldown expires
 let myAbilityActive      = false; // true while the boost/effect is running
 let mySpeedBoostEnd      = 0;    // performance.now() when local speed boost expires (for prediction)
+let myMoveSpeedMult      = 1.0;  // movement speed multiplier from equipped weapon
 const localSuppDevices   = new Map(); // id → { x, y, a, team, expiresAt }
 
 // Faction/team runtime state (resolved at game start)
@@ -4996,16 +4997,21 @@ function startGameForParty(mode, roomCode) {
 function subscribePartyChannel(code) {
     if (partyChannel) { SB().removeChannel(partyChannel); partyChannel = null; }
     partyChannel = SB().channel('party-' + code)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'parties',
-            filter: `code=eq.${code}` }, async payload => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'parties' }, async payload => {
+
+            // Client-side party-code filter.
+            // INSERT events carry the full new row; UPDATE/DELETE may only carry the
+            // primary-key column without REPLICA IDENTITY FULL, so code might be absent.
+            // When present and it doesn't match, skip. When absent, always re-fetch.
+            const changedCode = payload.new?.code || payload.old?.code;
+            if (changedCode && changedCode !== code) return;
 
             // Party row deleted (everyone left)
             if (payload.eventType === 'DELETE' || !payload.new) {
                 partyState = null; renderParty(); return;
             }
 
-            // Re-fetch full row from DB — payload.new can be incomplete when
-            // the table lacks REPLICA IDENTITY FULL, which drops column values
+            // Re-fetch full row from DB — payload.new is incomplete without REPLICA IDENTITY FULL
             const { data } = await SB().from('parties').select('*').eq('code', code).single();
             if (!data) { partyState = null; renderParty(); return; }
 
@@ -5019,10 +5025,10 @@ function subscribePartyChannel(code) {
             renderParty();
             renderFriendsList();
 
-            // Deploy signal: read from payload.new (not the re-fetched row) because
-            // deploy_mode is cleared from DB after 8 s — by then data.deploy_mode is null
-            if (payload.new.deploy_mode && partyState.leaderId !== ME()) {
-                startGameForParty(payload.new.deploy_mode, payload.new.deploy_room_code);
+            // Deploy signal: use re-fetched data (reliable even without REPLICA IDENTITY FULL).
+            // The 8-second clear window is well beyond the network round-trip for this re-fetch.
+            if (data.deploy_mode && partyState.leaderId !== ME()) {
+                startGameForParty(data.deploy_mode, data.deploy_room_code);
             }
         })
         .subscribe();
@@ -5102,13 +5108,28 @@ function partyCodeCopy() {
 
 async function partyInviteFriend(toUid, toName) {
     if (!partyState || !SB() || !ME()) return;
+    const btn = event?.target;
+
+    // Guard against duplicate invites — check if one already exists for this pair + party
+    const { data: existing } = await SB().from('party_invites')
+        .select('id')
+        .eq('from_uid', ME())
+        .eq('to_uid',   toUid)
+        .eq('party_code', partyState.code)
+        .limit(1);
+    if (existing && existing.length > 0) {
+        // Already sent — just reflect state visually
+        if (btn) { btn.textContent = 'Sent!'; btn.classList.replace('invite', 'invited'); }
+        return;
+    }
+
     const myName = localStorage.getItem('cw_name') || 'Pilot';
     await SB().from('party_invites').insert({
         from_uid: ME(), to_uid: toUid,
         from_name: myName, party_code: partyState.code,
     });
     // Give visual feedback on button
-    event?.target && (event.target.textContent = 'Sent!') && event.target.classList.replace('invite', 'invited');
+    if (btn) { btn.textContent = 'Sent!'; btn.classList.replace('invite', 'invited'); }
 }
 
 function showPartyInviteToast(invite) {
@@ -5227,7 +5248,7 @@ document.getElementById('btnJoin').addEventListener('click', () => {
         setStatus('Enter a room code for Private mode.', 'red');
         return;
     }
-    const addr = 'https://test-core-wars-backend.onrender.com';
+    const addr = 'https://core-wars-backend.onrender.com';
     myState.name = document.getElementById('pName').value.trim() || 'Pilot';
     saveProfile();
     setStatus('Connecting…', 'yellow');
@@ -5463,6 +5484,7 @@ function handleStart(d) {
     mySpeedBoostEnd      = 0;
     myAbilityCooldownEnd = 0;
     myAbilityActive      = false;
+    myMoveSpeedMult      = 1.0;
     // Infantry system reset on new game
     localInfantry.clear();
     infInterpBufs.clear();
@@ -5535,8 +5557,13 @@ function handleStart(d) {
         const op = opSelectOperators.find(o => o.id === myLoadout.operatorId);
         document.getElementById('operatorHudLabel').textContent = op ? op.displayName : (myLoadout.operatorId || '');
         chip.style.display = '';
+
+        // Apply weapon move-speed multiplier for client-side prediction
+        const _wDef = opSelectWeapons[myLoadout.weaponId];
+        myMoveSpeedMult = (_wDef && _wDef.moveSpeedMult != null) ? _wDef.moveSpeedMult : 1.0;
     } else if (chip) {
         chip.style.display = 'none';
+        myMoveSpeedMult = 1.0;
     }
 
     // Show faction announcement in chat area
@@ -6139,7 +6166,18 @@ function processEvents(evs) {
                     const rNow = performance.now();
                     // 1. Player — very close to local player position
                     let _shotIsLocalPlayer = false;
-                    if (ev.tm === myState.team &&
+                    if (myVehicleId && myVehicleRole === 'driver' && (ev.pt || '').endsWith('_drv')) {
+                        // Driver firing their hull weapon from inside a vehicle:
+                        // use the vehicle's center position with a larger radius to catch all muzzle offsets.
+                        const _myVeh = localVehicles.get(myVehicleId);
+                        if (_myVeh && ev.tm === myState.team &&
+                            Math.hypot(ev.x - _myVeh.x, ev.y - _myVeh.y) < 130) {
+                            playerRecoilT  = rNow;
+                            camRecoilT     = rNow;
+                            camRecoilAngle = ev.a;
+                            _shotIsLocalPlayer = true; // suppresses vehicleRecoil on the main barrel
+                        }
+                    } else if (ev.tm === myState.team &&
                         Math.hypot(ev.x - myState.x, ev.y - myState.y) < 55) {
                         playerRecoilT  = rNow;
                         camRecoilT     = rNow;
@@ -7697,8 +7735,8 @@ function predictMovement(dt) {
     // Apply speed boost multiplier if a speed ability is active — keeps client prediction
     // in sync with server movement so there are no microteleport snaps.
     const _spdMult = (performance.now() < mySpeedBoostEnd) ? 2.0 : 1.0;
-    let nx = myState.x + dx * 250 * _spdMult * dt;
-    let ny = myState.y + dy * 250 * _spdMult * dt;
+    let nx = myState.x + dx * 250 * myMoveSpeedMult * _spdMult * dt;
+    let ny = myState.y + dy * 250 * myMoveSpeedMult * _spdMult * dt;
 
     for (const b of localBuildings.values()) {
         if (b.tp === 'w') {
@@ -9969,7 +10007,8 @@ function drawVehicle(v) {
     ctx.rotate(-getCamRotation());
 
     const vDefC  = VEHICLE_DEFS[v.tp];
-    const hudY   = -(v.r + 18);
+    const _vR    = vDefC?.r ?? 50;   // v.r is not in wire format; read from VEHICLE_DEFS
+    const hudY   = -(_vR + 18);
     const barW   = 72;
 
     // HP bar
@@ -9993,7 +10032,7 @@ function drawVehicle(v) {
         const gap      = 3;                // gap between segments
         const segW     = (cbW - (capacity - 1) * gap) / capacity;
         const cbX      = -cbW / 2;
-        const cbY      = v.r + 10;         // below vehicle shadow
+        const cbY      = _vR + 10;         // below vehicle shadow
 
         // Background track
         ctx.fillStyle = 'rgba(0,0,0,0.70)';
@@ -10115,71 +10154,168 @@ function drawBuildings() {
             drawDepot(b, bFaction, col, light, dark, mid, camRot);
 
         } else if (b.tp === 'bk') {
-            // ── BARRACKS ─────────────────────────────────────────────────────
+            // ── BARRACKS — faction-specific top-down ─────────────────────────
             const r = 26;
             const now2 = performance.now();
-            const pulse = Math.sin(now2 / 800) * 0.3 + 0.7;
+            const pulse  = Math.sin(now2 / 800) * 0.5 + 0.5;
+            const pulse2 = Math.sin(now2 / 550 + 1.4) * 0.5 + 0.5;
+            const S = r;
 
-            // Shadow
+            // Drop shadow (all factions)
             ctx.fillStyle = 'rgba(0,0,0,0.4)';
-            ctx.beginPath(); ctx.ellipse(2, 3, r, r * 0.6, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(2, 3, S + 3, S * 0.7, 0, 0, Math.PI * 2); ctx.fill();
 
-            // Main body — hexagonal footprint
-            ctx.fillStyle = isRed ? '#450a0a' : '#0d2045';
-            ctx.strokeStyle = col;
-            ctx.lineWidth   = 2;
-            ctx.shadowColor = col; ctx.shadowBlur = 10 * pulse;
-            ctx.beginPath();
-            for (let _hi = 0; _hi < 6; _hi++) {
-                const _ha = (_hi / 6) * Math.PI * 2 - Math.PI / 6;
-                _hi === 0
-                    ? ctx.moveTo(Math.cos(_ha) * r, Math.sin(_ha) * r)
-                    : ctx.lineTo(Math.cos(_ha) * r, Math.sin(_ha) * r);
+            if (bFaction === 'roe') {
+                // ── ROE: Sandbagged field barracks — corrugated metal, battle-scarred ──
+                ctx.fillStyle = '#2d1d08';
+                ctx.beginPath(); ctx.roundRect(-S, -S, S * 2, S * 2, 2); ctx.fill();
+                ctx.fillStyle = '#3d2b10';
+                for (let i = 0; i < 4; i++) {
+                    const sx = (i - 1.5) * 13;
+                    ctx.beginPath(); ctx.ellipse(sx, -(S - 5), 6, 4, 0, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.ellipse(sx,  (S - 5), 6, 4, 0, 0, Math.PI * 2); ctx.fill();
+                }
+                for (let i = -1; i <= 1; i++) {
+                    ctx.beginPath(); ctx.ellipse(-(S - 5), i * 11, 4, 6, 0, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.ellipse( (S - 5), i * 11, 4, 6, 0, 0, Math.PI * 2); ctx.fill();
+                }
+                ctx.strokeStyle = '#1a1006'; ctx.lineWidth = 0.8; ctx.globalAlpha = 0.5;
+                for (let i = 0; i < 4; i++) {
+                    const sx = (i - 1.5) * 13;
+                    ctx.beginPath(); ctx.moveTo(sx, -(S-9)); ctx.lineTo(sx, -(S-1)); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(sx,  (S-9)); ctx.lineTo(sx,  (S-1)); ctx.stroke();
+                }
+                ctx.globalAlpha = 1;
+                const bx = -S + 8, by = -S + 8, bw = S * 2 - 16, bh = S * 2 - 16;
+                ctx.fillStyle = '#1a1007'; ctx.fillRect(bx, by, bw, bh);
+                ctx.strokeStyle = '#221408'; ctx.lineWidth = 1.5;
+                for (let rx = bx + 3; rx < bx + bw - 1; rx += 6) {
+                    ctx.beginPath(); ctx.moveTo(rx, by); ctx.lineTo(rx, by + bh); ctx.stroke();
+                }
+                ctx.fillStyle = '#2d1d0a'; ctx.globalAlpha = 0.55;
+                ctx.fillRect(bx, by, bw, 4); ctx.globalAlpha = 1;
+                ctx.strokeStyle = '#3d2b10'; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.5;
+                ctx.beginPath(); ctx.moveTo(bx + 3, by + 5); ctx.lineTo(bx + bw - 3, by + 5); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(bx + 3, by + bh - 5); ctx.lineTo(bx + bw - 3, by + bh - 5); ctx.stroke();
+                ctx.globalAlpha = 1;
+                ctx.fillStyle = '#3d2b10'; ctx.fillRect(-6, -5, 12, 10);
+                ctx.strokeStyle = '#1a1006'; ctx.lineWidth = 1;
+                ctx.strokeRect(-6, -5, 12, 10);
+                ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(6, 0); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, -5); ctx.lineTo(0, 5); ctx.stroke();
+                ctx.fillStyle = '#0a0602'; ctx.fillRect(S - 8, -7, 8, 14);
+                ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 8 + pulse * 6;
+                ctx.globalAlpha = 0.7 + pulse * 0.3;
+                ctx.beginPath(); ctx.arc(S - 5, -S + 5, 3, 0, Math.PI * 2); ctx.fill();
+                ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+                ctx.strokeStyle = '#4b3010'; ctx.lineWidth = 1.5;
+                ctx.strokeRect(-S, -S, S * 2, S * 2);
+
+            } else if (bFaction === 'bgm') {
+                // ── BGM: Industrial prefab barracks — steel walls, blast door, vents ──
+                ctx.fillStyle = '#180f04';
+                ctx.beginPath(); ctx.roundRect(-S, -S, S * 2, S * 2, 3); ctx.fill();
+                ctx.fillStyle = '#1e1208';
+                ctx.fillRect(-S + 6, -S + 6, S * 2 - 12, S * 2 - 12);
+                ctx.fillStyle = '#140e04'; ctx.fillRect(-S + 6, -3, S * 2 - 12, 6);
+                ctx.fillStyle = '#2a1a08';
+                ctx.fillRect(-S + 8, -S + 8, S * 2 - 16, 6);
+                ctx.fillRect(-S + 8, -S + 18, S * 2 - 16, 5);
+                ctx.fillRect(-S + 8,  S - 14, S * 2 - 16, 6);
+                ctx.fillRect(-S + 8,  S - 24, S * 2 - 16, 5);
+                ctx.strokeStyle = '#3d2510'; ctx.lineWidth = 1;
+                for (let bi = 1; bi < 4; bi++) {
+                    const bx2 = -S + 8 + bi * (S * 2 - 16) / 4;
+                    ctx.beginPath(); ctx.moveTo(bx2, -S + 8); ctx.lineTo(bx2, -S + 14); ctx.stroke();
+                }
+                ctx.fillStyle = '#251508'; ctx.fillRect(S - 10, -S + 6, 10, S * 2 - 12);
+                ctx.fillStyle = '#0a0602'; ctx.fillRect(S - 10, -8, 10, 16);
+                ctx.save();
+                ctx.beginPath(); ctx.rect(S - 10, -S + 6, 10, S * 2 - 12); ctx.clip();
+                for (let hy = -S + 6; hy < S - 4; hy += 9) {
+                    ctx.fillStyle = col; ctx.globalAlpha = 0.35; ctx.fillRect(S - 10, hy, 10, 5);
+                }
+                ctx.globalAlpha = 1; ctx.restore();
+                for (const vy of [-S + 10, S - 10]) {
+                    ctx.fillStyle = '#251508';
+                    ctx.beginPath(); ctx.arc(-S + 10, vy, 5, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = col; ctx.globalAlpha = 0.12 + pulse * 0.1;
+                    ctx.beginPath(); ctx.arc(-S + 10, vy, 5, 0, Math.PI * 2); ctx.fill();
+                    ctx.globalAlpha = 1;
+                }
+                ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 10 + pulse * 8;
+                ctx.globalAlpha = 0.65 + pulse * 0.35;
+                ctx.beginPath(); ctx.arc(S - 6, -S + 6, 3.5, 0, Math.PI * 2); ctx.fill();
+                ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+                ctx.strokeStyle = '#3d2510'; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.roundRect(-S, -S, S * 2, S * 2, 3); ctx.stroke();
+
+            } else {
+                // ── EPA: Clean modular habitat — precision panels, energy nodes ──
+                ctx.fillStyle = '#061014';
+                ctx.beginPath(); ctx.roundRect(-S, -S, S * 2, S * 2, 6); ctx.fill();
+                ctx.fillStyle = '#0b1e2e';
+                ctx.beginPath(); ctx.roundRect(-S + 5, -S + 5, S * 2 - 10, S * 2 - 10, 4); ctx.fill();
+                ctx.strokeStyle = col; ctx.lineWidth = 0.75; ctx.globalAlpha = 0.08;
+                for (let gx = -S + 10; gx < S; gx += 10) {
+                    ctx.beginPath(); ctx.moveTo(gx, -S + 5); ctx.lineTo(gx, S - 5); ctx.stroke();
+                }
+                for (let gy = -S + 10; gy < S; gy += 10) {
+                    ctx.beginPath(); ctx.moveTo(-S + 5, gy); ctx.lineTo(S - 5, gy); ctx.stroke();
+                }
+                ctx.globalAlpha = 1;
+                ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.globalAlpha = 0.2;
+                ctx.strokeRect(-S + 7, -S + 7, S * 2 - 14, S - 5);
+                ctx.strokeRect(-S + 7,      2, S * 2 - 14, S - 7);
+                ctx.globalAlpha = 1;
+                for (const [ex, ey] of [[-S+5,-S+5],[S-5,-S+5],[-S+5,S-5],[S-5,S-5]]) {
+                    ctx.fillStyle = mid; ctx.beginPath(); ctx.arc(ex, ey, 4, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 6 + pulse * 4;
+                    ctx.globalAlpha = 0.85;
+                    ctx.beginPath(); ctx.arc(ex, ey, 2, 0, Math.PI * 2); ctx.fill();
+                    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+                }
+                ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.globalAlpha = 0.1 + pulse * 0.07;
+                ctx.beginPath();
+                ctx.moveTo(-S+5,-S+5); ctx.lineTo(S-5,-S+5);
+                ctx.moveTo(-S+5, S-5); ctx.lineTo(S-5, S-5);
+                ctx.moveTo(-S+5,-S+5); ctx.lineTo(-S+5,S-5);
+                ctx.moveTo( S-5,-S+5); ctx.lineTo( S-5,S-5);
+                ctx.stroke(); ctx.globalAlpha = 1;
+                ctx.fillStyle = '#0d2230'; ctx.fillRect(S - 9, -S + 5, 9, S * 2 - 10);
+                ctx.fillStyle = '#030a0e'; ctx.fillRect(S - 9, -8, 9, 16);
+                ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.globalAlpha = 0.35;
+                ctx.strokeRect(S - 9, -S + 5, 9, S * 2 - 10); ctx.globalAlpha = 1;
+                ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 6;
+                ctx.globalAlpha = 0.45 + pulse * 0.2;
+                ctx.fillRect(-S + 8, -S, S * 2 - 16, 2); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+                ctx.strokeStyle = mid; ctx.lineWidth = 1.5;
+                ctx.beginPath(); ctx.roundRect(-S, -S, S * 2, S * 2, 6); ctx.stroke();
             }
-            ctx.closePath(); ctx.fill(); ctx.stroke();
-            ctx.shadowBlur = 0;
 
-            // Inner platform ring
-            ctx.strokeStyle = col; ctx.lineWidth = 1.5;
-            ctx.globalAlpha = 0.35;
-            ctx.beginPath(); ctx.arc(0, 0, r - 6, 0, Math.PI * 2); ctx.stroke();
-            ctx.globalAlpha = 1;
-
-            // Infantry mode icon at center
-            const mode = b.infantryMode || 'grunt';
-            ctx.fillStyle = col;
-            ctx.font = 'bold 11px "Barlow Condensed", sans-serif';
-            ctx.textAlign    = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.shadowColor = col; ctx.shadowBlur = 8 * pulse;
-            const modeIcon = mode === 'heavy'         ? '⬛'
-                           : mode === 'roe_breach'    ? '▪'
-                           : mode === 'roe_rifle'     ? '▸'
-                           : mode === 'bgm_bur3'     ? '◈'
-                           : mode === 'bgm_bur8'     ? '◆'
-                           : mode === 'epa_guardian'  ? '⊞'
-                           : mode === 'epa_intercept' ? '◎'
-                           : '■';
-            ctx.fillText(modeIcon, 0, 0);
-            ctx.shadowBlur = 0;
-
-            // Production progress indicator — arc around edge
-            const timeSinceProd = (now2 % 4000) / 4000;  // approximate 4s cycle (client-side)
-            ctx.strokeStyle = col; ctx.lineWidth = 3.5;
-            ctx.globalAlpha = 0.6;
+            // Production progress arc — synced to server lastProduction timestamp
+            // b.lp is sent by server in wireBuild; arc fills in 4 s then resets
+            const _prodElapsed = Math.min(now2 - (b.lp || 0), 4000);
+            const timeSinceProd = _prodElapsed / 4000;
+            ctx.strokeStyle = col; ctx.lineWidth = 3.5; ctx.globalAlpha = 0.55;
             ctx.beginPath();
-            ctx.arc(0, 0, r + 3, -Math.PI / 2, -Math.PI / 2 + timeSinceProd * Math.PI * 2);
-            ctx.stroke();
-            ctx.globalAlpha = 1;
+            ctx.arc(0, 0, S + 5, -Math.PI / 2, -Math.PI / 2 + timeSinceProd * Math.PI * 2);
+            ctx.stroke(); ctx.globalAlpha = 1;
 
-            // HP bar
+            // Center mode indicator dot
+            ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 6 + pulse * 4;
+            ctx.globalAlpha = 0.8 + pulse * 0.2;
+            ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+
+            // HP bar (when damaged)
             const hpFrac = b.hp / (b.mhp || 300);
             if (hpFrac < 0.99) {
                 const bLen = 40;
                 ctx.fillStyle = 'rgba(0,0,0,0.5)';
-                ctx.fillRect(-bLen / 2, r + 5, bLen, 3);
+                ctx.fillRect(-bLen / 2, S + 8, bLen, 3);
                 ctx.fillStyle = hpFrac > 0.5 ? '#22c55e' : '#ef4444';
-                ctx.fillRect(-bLen / 2, r + 5, bLen * hpFrac, 3);
+                ctx.fillRect(-bLen / 2, S + 8, bLen * hpFrac, 3);
             }
 
         } else if (b.tp === 'w') {
